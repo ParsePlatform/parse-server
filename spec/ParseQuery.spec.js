@@ -2439,6 +2439,27 @@ describe('Parse.Query testing', () => {
     });
   });
 
+  it('handles nested includes with no results', async () => {
+    const obj = new TestObject({ foo: 'bar' });
+    await obj.save();
+
+    const query = new Parse.Query(TestObject)
+      .equalTo('objectId', obj.id)
+      .include('fake.path');
+
+    // This query with should not reject
+    const results = await query.find();
+
+    // ... and we should get back the one object we saved
+    expect(results.length).toBe(1);
+
+    // ... and it should not add the `fake` attribute from the query that
+    // doesn't exist on the object
+    expect(
+      Object.prototype.hasOwnProperty.call(results[0].attributes, 'fake')
+    ).toBeFalse();
+  });
+
   it("include doesn't make dirty wrong", function(done) {
     const Parent = Parse.Object.extend('ParentObject');
     const Child = Parse.Object.extend('ChildObject');
