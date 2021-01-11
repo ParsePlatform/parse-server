@@ -6,10 +6,8 @@ import AppCache from './cache';
 import SchemaCache from './Controllers/SchemaCache';
 import DatabaseController from './Controllers/DatabaseController';
 import net from 'net';
-import {
-  IdempotencyOptions,
-  FileUploadOptions,
-} from './Options/Definitions';
+import Parse from 'parse/node';
+import { IdempotencyOptions, FileUploadOptions } from './Options/Definitions';
 
 function removeTrailingSlash(str) {
   if (!str) {
@@ -75,6 +73,7 @@ export class Config {
     idempotencyOptions,
     emailVerifyTokenReuseIfValid,
     fileUpload,
+    defaultACL,
   }) {
     if (masterKey === readOnlyMasterKey) {
       throw new Error('masterKey and readOnlyMasterKey should be different');
@@ -109,6 +108,7 @@ export class Config {
     this.validateMaxLimit(maxLimit);
     this.validateAllowHeaders(allowHeaders);
     this.validateIdempotencyOptions(idempotencyOptions);
+    this.validateDefaultACLOptions(defaultACL);
   }
 
   static validateIdempotencyOptions(idempotencyOptions) {
@@ -128,7 +128,19 @@ export class Config {
       throw 'idempotency paths must be of an array of strings';
     }
   }
-
+  static validateDefaultACLOptions(aclOptions) {
+    if (!aclOptions) {
+      return;
+    }
+    if (typeof aclOptions !== 'object') {
+      throw 'defaultACL must be an object';
+    }
+    try {
+      new Parse.ACL(aclOptions);
+    } catch (e) {
+      throw 'Could not validate default ACL object. Error: invalid permission type.';
+    }
+  }
   static validateAccountLockoutPolicy(accountLockout) {
     if (accountLockout) {
       if (

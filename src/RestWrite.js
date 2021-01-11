@@ -108,6 +108,9 @@ RestWrite.prototype.execute = function () {
       return this.runBeforeSaveTrigger();
     })
     .then(() => {
+      return this.buildDefaultACL();
+    })
+    .then(() => {
       return this.deleteEmailResetTokenIfNeeded();
     })
     .then(() => {
@@ -195,6 +198,37 @@ RestWrite.prototype.validateSchema = function () {
     this.query,
     this.runOptions
   );
+};
+
+// builds the default ACL depending on the className
+RestWrite.prototype.buildDefaultACL = function () {
+  if ((this.query && this.query.objectId) || this.data.ACL) {
+    return;
+  }
+  const defaultACL = {
+    currentUser: {
+      read: true,
+      write: true,
+    },
+  };
+  const aclOptions = Object.assign({}, this.config.defaultACL || defaultACL);
+  const reqUser = this.auth.user && this.auth.user.id;
+  if (reqUser && aclOptions.currentUser) {
+    aclOptions[reqUser] = aclOptions.currentUser;
+  }
+  delete aclOptions.currentUser;
+  const publicACL = new Parse.ACL();
+  publicACL.setPublicReadAccess(true);
+  publicACL.setPublicWriteAccess(true);
+  const newACL = new Parse.ACL(aclOptions);
+  if (publicACL.equals(newACL)) {
+    return;
+  }
+  this.data.ACL = aclOptions;
+  this.storage.fieldsChangedByTrigger = this.storage.fieldsChangedByTrigger || [];
+  if (this.storage.fieldsChangedByTrigger.indexOf('ACL') < 0) {
+    this.storage.fieldsChangedByTrigger.push('ACL');
+  }
 };
 
 // Runs any beforeSave triggers against this operation.

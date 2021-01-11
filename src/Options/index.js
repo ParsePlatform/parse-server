@@ -12,6 +12,7 @@ type Adapter<T> = string | any | T;
 type NumberOrBoolean = number | boolean;
 type NumberOrString = number | string;
 type ProtectedFields = any;
+type ACLOptions = any;
 
 export interface ParseServerOptions {
   /* Your Parse Application ID
@@ -198,6 +199,10 @@ export interface ParseServerOptions {
   :ENV: PARSE_SERVER_EXPERIMENTAL_IDEMPOTENCY_OPTIONS
   :DEFAULT: false */
   idempotencyOptions: ?IdempotencyOptions;
+  /* Options for default ACL on classes
+  :ENV: PARSE_SERVER_DEFAULT_ACL
+  :DEFAULT: {'currentUser':{'read':true,'write':true}} */
+  defaultACL: ?ACLOptions;
   /* Options for file uploads
   :ENV: PARSE_SERVER_FILE_UPLOAD_OPTIONS */
   fileUpload: ?FileUploadOptions;

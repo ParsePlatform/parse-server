@@ -99,6 +99,12 @@ const defaultConfiguration = {
       apiKey: 'yolo',
     },
   },
+  defaultACL: {
+    '*': {
+      read: true,
+      write: true,
+    },
+  },
   auth: {
     // Override the facebook provider
     custom: mockCustom(),

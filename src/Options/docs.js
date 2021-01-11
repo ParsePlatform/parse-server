@@ -20,6 +20,7 @@
  * @property {Adapter<StorageAdapter>} databaseAdapter Adapter module for the database
  * @property {Any} databaseOptions Options to pass to the mongodb client
  * @property {String} databaseURI The full URI to your database. Supported databases are mongodb or postgres.
+ * @property {ACLOptions} defaultACL Options for default ACL on classes
  * @property {Boolean} directAccess Replace HTTP Interface when using JS SDK in current node runtime, defaults to false. Caution, this is an experimental feature that may not be appropriate for production.
  * @property {String} dotNetKey Key for Unity and .Net SDK
  * @property {Adapter<MailAdapter>} emailAdapter Adapter module for email sending

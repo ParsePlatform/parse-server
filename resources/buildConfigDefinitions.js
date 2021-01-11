@@ -180,6 +180,15 @@ function parseDefaultValue(elt, value, t) {
       );
       literalValue = t.objectExpression([prop]);
     }
+    if (type == 'ACLOptions') {
+      const prop = t.objectProperty(
+        t.stringLiteral('currentUser'), t.objectPattern([
+          t.objectProperty(t.stringLiteral('read'), t.booleanLiteral(true)),
+          t.objectProperty(t.stringLiteral('write'), t.booleanLiteral(true)),
+        ])
+      );
+      literalValue = t.objectExpression([prop]);
+    }
   }
   return literalValue;
 }
