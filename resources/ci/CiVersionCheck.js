@@ -1,6 +1,7 @@
 const core = require('@actions/core');
 const semver = require('semver');
 const yaml = require('yaml');
+const lodash = require('lodash');
 const fs = require('fs').promises;
 
 /**
@@ -43,6 +44,8 @@ class CiVersionCheck {
    * test against 2.0.0.
    * If the latest version component is `major` then the check would
    * fail and recommend an upgrade to version 2.0.0.
+   * @param {Boolean} [config.updateYaml=false] Is true if the YAML file
+   * should be updated and package versions should be bumped.
    */
   constructor(config) {
     const {
@@ -54,6 +57,7 @@ class CiVersionCheck {
       releasedVersions,
       ignoreReleasedVersions = [],
       latestComponent = CiVersionCheck.versionComponents.patch,
+      updateYaml = false,
     } = config;
 
     // Ensure required params are set
@@ -64,6 +68,9 @@ class CiVersionCheck {
       ciEnvironmentsKeyPath,
       ciVersionKey,
       releasedVersions,
+      ignoreReleasedVersions,
+      latestComponent,
+      updateYaml,
     ].includes(undefined)) {
       throw 'invalid configuration';
     }
@@ -80,6 +87,7 @@ class CiVersionCheck {
     this.releasedVersions = releasedVersions;
     this.ignoreReleasedVersions = ignoreReleasedVersions;
     this.latestComponent = latestComponent;
+    this.updateYaml = updateYaml;
   }
 
   /**
@@ -101,9 +109,10 @@ class CiVersionCheck {
       // Get CI workflow
       const ciYaml = await fs.readFile(this.yamlFilePath, 'utf-8');
       const ci = yaml.parse(ciYaml);
+      this.ci = ci;
 
       // Extract package versions
-      let versions = this.ciEnvironmentsKeyPath.split('.').reduce((o,k) => o !== undefined ? o[k] : undefined, ci);
+      let versions = this._getKeyAtPath(ci, this.ciEnvironmentsKeyPath);
       versions = Object.entries(versions)
         .map(entry => entry[1])
         .filter(entry => entry[this.ciVersionKey]);
@@ -112,6 +121,16 @@ class CiVersionCheck {
     } catch (e) {
       throw `Failed to determine ${this.packageName} versions from CI YAML file with error: ${e}`;
     }
+  }
+
+  /**
+   * Returns the value at a given key path.
+   * @param {Object} obj The object to traverse.
+   * @param {String} keyPath The path to the key to return.
+   * @returns {Any} The value at the given key path.
+   */
+  _getKeyAtPath(obj, keyPath) {
+    return keyPath.split('.').reduce((o,k) => o !== undefined ? o[k] : undefined, obj);
   }
 
   /**
@@ -144,11 +163,7 @@ class CiVersionCheck {
     // ];
 
     // Determine operator for range comparison
-    const operator = versionComponent == CiVersionCheck.versionComponents.major
-      ? '>='
-      : versionComponent == CiVersionCheck.versionComponents.minor
-        ? '^'
-        : '~'
+    const operator = this._getOperatorForVersionComponent(versionComponent);
 
     // Get all untested versions
     const untestedVersions = releasedVersions.reduce((m, v) => {
@@ -187,11 +202,7 @@ class CiVersionCheck {
    */
   getNewerVersion(versions, version, versionComponent) {
     // Determine operator for range comparison
-    const operator = versionComponent == CiVersionCheck.versionComponents.major
-      ? '>='
-      : versionComponent == CiVersionCheck.versionComponents.minor
-        ? '^'
-        : '~'
+    const operator = this._getOperatorForVersionComponent(versionComponent);
     const latest = semver.maxSatisfying(versions, `${operator}${version}`);
     return semver.gt(latest, version) ? latest : undefined;
   }
@@ -207,6 +218,57 @@ class CiVersionCheck {
         throw version;
       }
     }
+  }
+
+  /**
+   * Returns the semver range operator that relates to the a version component.
+   * For example, the operator for the `patch` version component defines a
+   * range up to the highest patch version.
+   * @param {String} component The version component (`patch`, `minor`,
+   * `major`).
+   * @returns {String} The semver operator.
+   */
+  _getOperatorForVersionComponent(component) {
+    // Determine operator for range comparison
+    return component == CiVersionCheck.versionComponents.major
+      ? '>='
+      : component == CiVersionCheck.versionComponents.minor
+        ? '^'
+        : '~'
+  }
+
+  /**
+   * Updates a key in the CI YAML file with a given value.
+   * @param {Array<Object>} update The key to update.
+   * @param {String} update.old The old value to update.
+   * @param {String} update.new The new value to set.
+   */
+  async _updateYaml(update) {
+    if (this.ci === undefined) {
+      throw 'YAML file has not been read.';
+    }
+
+    // Get environments
+    const newCi = lodash.cloneDeep(this.ci);
+    const envs = this._getKeyAtPath(newCi, this.ciEnvironmentsKeyPath);
+
+    // Update keys
+    for (const key of Object.keys(update)) {
+      for (const oldValue of Object.keys(update[key])) {
+        const newValue = update[key][oldValue];
+
+        // Update value
+        for (const env of envs) {
+          if (env[key] == oldValue) {
+            env[key] = newValue;
+          }
+        }
+      }
+    }
+
+    // Write to file
+    const newYaml = yaml.stringify(newCi);
+    await fs.writeFile(this.yamlFilePath, newYaml);
   }
 
   /**
@@ -233,6 +295,9 @@ class CiVersionCheck {
       // Is true if any of the checks failed
       let failed = false;
 
+      // The keys that should be updated
+      const keyUpdatesNeeded = {};
+
       // Check whether each tested version is the latest patch
       for (const test of tests) {
         const version = test[this.ciVersionKey];
@@ -249,6 +314,7 @@ class CiVersionCheck {
         if (newer) {
           console.log(`❌ CI environment '${test.name}' uses an old ${this.packageName} ${this.latestComponent} version ${version} instead of ${newer}.`);
           failed = true;
+          keyUpdatesNeeded[this.ciVersionKey] = Object.assign(keyUpdatesNeeded[this.ciVersionKey] || {}, { [version]: newer });
         } else {
           console.log(`✅ CI environment '${test.name}' uses the latest ${this.packageName} ${this.latestComponent} version ${version}.`);
         }
@@ -268,9 +334,19 @@ class CiVersionCheck {
         core.setFailed(
           `CI environments are not up-to-date with the latest ${this.packageName} versions.` +
           `\n\nCheck the error messages above and update the ${this.packageName} versions in the CI YAML ` +
-          `file.\n\nℹ️ Additionally, there may be versions of ${this.packageName} that have reached their official end-of-life ` +
-          `support date and should be removed from the CI, see ${this.packageSupportUrl}.`
+          `file. Additionally, check for versions of ${this.packageName} that have reached their official end-of-life ` +
+          `support date and may be removed from the CI, see ${this.packageSupportUrl}.`
         );
+
+        // If packages in YAML file should be updated
+        if (this.updateYaml && Object.keys(keyUpdatesNeeded).length > 0) {
+          try {
+            this._updateYaml(keyUpdatesNeeded);
+          } catch (e) {
+            console.log(`Failed to update ${this.packageName} versions in YAML file with error: ${e}`);
+          }
+          console.log(`\n🚀 Updated YAML file to use newer versions of ${this.packageName}. Check the Pull Request list for a PR.`);
+        }
       }
 
     } catch (e) {

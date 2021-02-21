@@ -32,12 +32,41 @@ jobs:
         run: npm ci
       - name: CI Self-Check
         run: npm run ci:check
+      - name: Create PR to upgrade CI environments if needed
+        if: ${{ always() }}
+        uses: peter-evans/create-pull-request@v3
+        with:
+          title: Upgrade CI environments
+          body: This is an automated PR to upgrade package versions in CI environments.
+          commit-message: Upgrading versions of MongoDB / Node.js
+          branch: upgrade-ci-environments
+          base: master
+  check-lint:
+    name: Lint
+    timeout-minutes: 30
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.NODE_VERSION }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Cache Node.js modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ matrix.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.NODE_VERSION }}-
+      - name: Install dependencies
+        run: npm ci
+      - run: npm run lint
   check-mongo:
     strategy:
       matrix:
         include:
           - name: Mongo 4.4, ReplicaSet, WiredTiger
-            MONGODB_VERSION: 4.4.4
+            MONGODB_VERSION: 4.4.3
             MONGODB_TOPOLOGY: replicaset
             MONGODB_STORAGE_ENGINE: wiredTiger
             NODE_VERSION: 14.15.5
@@ -58,27 +87,28 @@ jobs:
             NODE_VERSION: 14.15.5
           - name: Redis Cache
             PARSE_SERVER_TEST_CACHE: redis
-            MONGODB_VERSION: 4.4.4
+            MONGODB_VERSION: 4.4.3
             MONGODB_TOPOLOGY: standalone
             MONGODB_STORAGE_ENGINE: wiredTiger
             NODE_VERSION: 14.15.5
           - name: Node 10
-            MONGODB_VERSION: 4.4.4
+            MONGODB_VERSION: 4.4.3
             MONGODB_TOPOLOGY: standalone
             MONGODB_STORAGE_ENGINE: wiredTiger
             NODE_VERSION: 10.23.3
           - name: Node 12
-            MONGODB_VERSION: 4.4.4
+            MONGODB_VERSION: 4.4.3
             MONGODB_TOPOLOGY: standalone
             MONGODB_STORAGE_ENGINE: wiredTiger
             NODE_VERSION: 12.20.2
           - name: Node 15
-            MONGODB_VERSION: 4.4.4
+            MONGODB_VERSION: 4.4.3
             MONGODB_TOPOLOGY: standalone
             MONGODB_STORAGE_ENGINE: wiredTiger
             NODE_VERSION: 15.9.0
     name: ${{ matrix.name }}
     timeout-minutes: 30
+    needs: check-ci
     runs-on: ubuntu-18.04
     services:
       redis:
@@ -106,8 +136,6 @@ jobs:
             ${{ runner.os }}-node-${{ matrix.NODE_VERSION }}-
       - name: Install dependencies
         run: npm ci
-      - if: ${{ matrix.name == 'Mongo 3.6.21' }}
-        run: npm run lint
       - run: npm run pretest
       - run: npm run coverage
         env:
@@ -129,6 +157,7 @@ jobs:
             POSTGRES_IMAGE: postgis/postgis:13-3.1
     name: ${{ matrix.name }}
     timeout-minutes: 30
+    needs: check-ci
     runs-on: ubuntu-18.04
     services:
       redis:

@@ -95,7 +95,7 @@
     "node-fetch": "2.6.1",
     "nyc": "15.1.0",
     "prettier": "2.0.5",
-    "yaml": "1.10.0"
+    "yaml": "2.0.0-3"
   },
   "scripts": {
     "ci:check": "node ./resources/ci/ciCheck.js",
