@@ -1327,7 +1327,7 @@ describe('oauth2 auth adapter', () => {
 describe('apple signin auth adapter', () => {
   const apple = require('../lib/Adapters/Auth/apple');
   const jwt = require('jsonwebtoken');
-  const util = require('util');
+  const jwksClient = require('jwks-rsa');
 
   it('(using client id as string) should throw error with missing id_token', async () => {
     try {
@@ -1389,7 +1389,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
 
     const result = await apple.validateAuthData(
       { id: 'the_user_id', token: 'the_token' },
@@ -1405,7 +1405,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
 
     try {
       await apple.validateAuthData(
@@ -1442,7 +1442,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await apple.validateAuthData(
@@ -1464,7 +1464,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await apple.validateAuthData(
@@ -1486,7 +1486,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await apple.validateAuthData(
@@ -1506,7 +1506,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -1534,7 +1534,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -1563,7 +1563,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -1635,7 +1635,7 @@ describe('apple signin auth adapter', () => {
     const fakeGetSigningKeyAsyncFunction = () => {
       return { kid: '123', rsaPublicKey: 'the_rsa_public_key' };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -1760,7 +1760,7 @@ describe('microsoft graph auth adapter', () => {
 describe('facebook limited auth adapter', () => {
   const facebook = require('../lib/Adapters/Auth/facebook');
   const jwt = require('jsonwebtoken');
-  const util = require('util');
+  const jwksClient = require('jwks-rsa');
 
   // TODO: figure out a way to run this test alongside facebook classic tests
   xit('(using client id as string) should throw error with missing id_token', async () => {
@@ -1831,7 +1831,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
 
     const result = await facebook.validateAuthData(
       { id: 'the_user_id', token: 'the_token' },
@@ -1852,7 +1852,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
 
     try {
       await facebook.validateAuthData(
@@ -1894,7 +1894,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await facebook.validateAuthData(
@@ -1921,7 +1921,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await facebook.validateAuthData(
@@ -1948,7 +1948,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     const result = await facebook.validateAuthData(
@@ -1973,7 +1973,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -2006,7 +2006,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -2040,7 +2040,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {
@@ -2126,7 +2126,7 @@ describe('facebook limited auth adapter', () => {
         rsaPublicKey: 'the_rsa_public_key',
       };
     };
-    spyOn(util, 'promisify').and.callFake(() => fakeGetSigningKeyAsyncFunction);
+    spyOn(jwksClient, 'getSigningKey').and.callFake(() => fakeGetSigningKeyAsyncFunction);
     spyOn(jwt, 'verify').and.callFake(() => fakeClaim);
 
     try {

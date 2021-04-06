@@ -42,7 +42,7 @@
     "graphql-upload": "11.0.0",
     "intersect": "1.0.1",
     "jsonwebtoken": "8.5.1",
-    "jwks-rsa": "1.12.3",
+    "jwks-rsa": "2.0.2",
     "ldapjs": "2.2.4",
     "lodash": "4.17.21",
     "lru-cache": "5.1.1",
@@ -125,7 +125,7 @@
     "postinstall": "node -p 'require(\"./postinstall.js\")()'"
   },
   "engines": {
-    "node": ">= 8"
+    "node": ">= 10"
   },
   "bin": {
     "parse-server": "bin/parse-server"
