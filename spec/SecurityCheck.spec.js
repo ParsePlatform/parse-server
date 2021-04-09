@@ -23,14 +23,20 @@ describe('Security Check', () => {
     await reconfigureServer(config);
   }
 
-  const securityRequest = (options) => request(Object.assign({
-    url: securityUrl,
-    headers: {
-      'X-Parse-Master-Key': Parse.masterKey,
-      'X-Parse-Application-Id': Parse.applicationId,
-    },
-    followRedirects: false,
-  }, options)).catch(e => e);
+  const securityRequest = options =>
+    request(
+      Object.assign(
+        {
+          url: securityUrl,
+          headers: {
+            'X-Parse-Master-Key': Parse.masterKey,
+            'X-Parse-Application-Id': Parse.applicationId,
+          },
+          followRedirects: false,
+        },
+        options
+      )
+    ).catch(e => e);
 
   beforeEach(async () => {
     groupName = 'Example Group Name';
@@ -41,7 +47,7 @@ describe('Security Check', () => {
       solution: 'TestSolution',
       check: () => {
         return true;
-      }
+      },
     });
     checkFail = new Check({
       group: 'TestGroup',
@@ -50,14 +56,14 @@ describe('Security Check', () => {
       solution: 'TestSolution',
       check: () => {
         throw 'Fail';
-      }
+      },
     });
     Group = class Group extends CheckGroup {
       setName() {
         return groupName;
       }
       setChecks() {
-        return [ checkSuccess, checkFail ];
+        return [checkSuccess, checkFail];
       }
     };
     config = {
@@ -154,7 +160,7 @@ describe('Security Check', () => {
           title: 'string',
           warning: 'string',
           solution: 'string',
-          check: () => {}
+          check: () => {},
         },
         {
           group: 'string',
@@ -203,7 +209,9 @@ describe('Security Check', () => {
         title: 'string',
         warning: 'string',
         solution: 'string',
-        check: () => { throw 'error' },
+        check: () => {
+          throw 'error';
+        },
       });
       expect(check._checkState == CheckState.none);
       check.run();
@@ -277,7 +285,7 @@ describe('Security Check', () => {
     });
 
     it('runs all checks of all groups', async () => {
-      const checkGroups = [ Group, Group ];
+      const checkGroups = [Group, Group];
       const runner = new CheckRunner({ checkGroups });
       const report = await runner.run();
       expect(report.report.groups[0].checks[0].state).toBe(CheckState.success);
@@ -287,27 +295,27 @@ describe('Security Check', () => {
     });
 
     it('reports correct default syntax version 1.0.0', async () => {
-      const checkGroups = [ Group ];
+      const checkGroups = [Group];
       const runner = new CheckRunner({ checkGroups, enableCheckLog: true });
       const report = await runner.run();
       expect(report).toEqual({
         report: {
-          version: "1.0.0",
-          state: "fail",
+          version: '1.0.0',
+          state: 'fail',
           groups: [
             {
-              name: "Example Group Name",
-              state: "fail",
+              name: 'Example Group Name',
+              state: 'fail',
               checks: [
                 {
-                  title: "TestTitleSuccess",
-                  state: "success",
+                  title: 'TestTitleSuccess',
+                  state: 'success',
                 },
                 {
-                  title: "TestTitleFail",
-                  state: "fail",
-                  warning: "TestWarning",
-                  solution: "TestSolution",
+                  title: 'TestTitleFail',
+                  state: 'fail',
+                  warning: 'TestWarning',
+                  solution: 'TestSolution',
                 },
               ],
             },
@@ -319,7 +327,7 @@ describe('Security Check', () => {
     it('logs report', async () => {
       const logger = require('../lib/logger').logger;
       const logSpy = spyOn(logger, 'warn').and.callThrough();
-      const checkGroups = [ Group ];
+      const checkGroups = [Group];
       const runner = new CheckRunner({ checkGroups, enableCheckLog: true });
       const report = await runner.run();
       const titles = report.report.groups.flatMap(group => group.checks.map(check => check.title));

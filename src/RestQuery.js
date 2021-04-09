@@ -580,7 +580,7 @@ RestQuery.prototype.replaceDontSelect = function () {
   });
 };
 
-const cleanResultAuthData = function (result) {
+RestQuery.prototype.cleanResultAuthData = function (result) {
   delete result.password;
   if (result.authData) {
     Object.keys(result.authData).forEach(provider => {
@@ -649,7 +649,7 @@ RestQuery.prototype.runFind = function (options = {}) {
     .then(results => {
       if (this.className === '_User' && findOptions.explain !== true) {
         for (var result of results) {
-          cleanResultAuthData(result);
+          this.cleanResultAuthData(result, this.auth, this.config);
         }
       }
 

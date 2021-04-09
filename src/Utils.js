@@ -178,7 +178,7 @@ class Utils {
       const type = types[key];
       const isOptional = !!type.o;
       const param = params[key];
-      if (!(isOptional && param == null) && (!type.v(param))) {
+      if (!(isOptional && param == null) && !type.v(param)) {
         throw `Invalid parameter ${key} must be of type ${type.t} but is ${typeof param}`;
       }
     }

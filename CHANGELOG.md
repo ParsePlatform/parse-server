@@ -95,7 +95,9 @@ ___
 - Removed [parse-server-simple-mailgun-adapter](https://github.com/parse-community/parse-server-simple-mailgun-adapter) dependency; to continue using the adapter it has to be explicitly installed (Manuel Trezza) [#7321](https://github.com/parse-community/parse-server/pull/7321)
 - Remove support for MongoDB 3.6 which has reached its End-of-Life date and PostgreSQL 10 (Manuel Trezza) [#7315](https://github.com/parse-community/parse-server/pull/7315)
 - Remove support for Node 10 which has reached its End-of-Life date (Manuel Trezza) [#7314](https://github.com/parse-community/parse-server/pull/7314)
+- Auth Adapter now always validate authData at login tim (Moumouls) [#7079](https://github.com/parse-community/parse-server/pull/7079)
 ### Notable Changes
+- Internal rework for 3rd party auth providers, new auth challenge endpoint, webauthn auth adapter (ex: fingerprint scanner, FaceID, security keys), new system for futur 2FA (ex: email + otp), new system that allow optional/complementary auth provider (ex: email/pwd or webauthn for same user), new internal interface for an easier auth adapters implementation (Moumouls) [#7079](https://github.com/parse-community/parse-server/pull/7079)
 - Added Parse Server Security Check to report weak security settings (Manuel Trezza, dblythy) [#7247](https://github.com/parse-community/parse-server/issues/7247)
 - EXPERIMENTAL: Added new page router with placeholder rendering and localization of custom and feature pages such as password reset and email verification (Manuel Trezza) [#6891](https://github.com/parse-community/parse-server/issues/6891)
 - EXPERIMENTAL: Added custom routes to easily customize flows for password reset, email verification or build entirely new flows (Manuel Trezza) [#7231](https://github.com/parse-community/parse-server/issues/7231)

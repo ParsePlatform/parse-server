@@ -1792,7 +1792,7 @@ describe('Parse.User testing', () => {
     });
   });
 
-  it('should allow login with old authData token', done => {
+  it('should not allow login with old authData token', async () => {
     const provider = {
       authData: {
         id: '12345',
@@ -1813,22 +1813,17 @@ describe('Parse.User testing', () => {
     };
     defaultConfiguration.auth.shortLivedAuth.setValidAccessToken('token');
     Parse.User._registerAuthenticationProvider(provider);
-    Parse.User._logInWith('shortLivedAuth', {})
-      .then(() => {
-        // Simulate a remotely expired token (like a short lived one)
-        // In this case, we want success as it was valid once.
-        // If the client needs an updated one, do lock the user out
-        defaultConfiguration.auth.shortLivedAuth.setValidAccessToken('otherToken');
-        return Parse.User._logInWith('shortLivedAuth', {});
-      })
-      .then(
-        () => {
-          done();
-        },
-        err => {
-          done.fail(err);
-        }
-      );
+    await Parse.User._logInWith('shortLivedAuth', {});
+    // Simulate a remotely expired token (like a short lived one)
+    // In this case, we want success as it was valid once.
+    // If the client needs an updated one, do lock the user out
+    defaultConfiguration.auth.shortLivedAuth.setValidAccessToken('otherToken');
+    try {
+      await Parse.User._logInWith('shortLivedAuth', {});
+      fail('should not authenticate');
+    } catch (e) {
+      expect(e).toBeDefined();
+    }
   });
 
   it('should allow PUT request with stale auth Data', done => {
@@ -2260,37 +2255,14 @@ describe('Parse.User testing', () => {
     });
 
     describe('anonymous users', () => {
-      beforeEach(() => {
-        const insensitiveCollisions = [
-          'abcdefghijklmnop',
-          'Abcdefghijklmnop',
-          'ABcdefghijklmnop',
-          'ABCdefghijklmnop',
-          'ABCDefghijklmnop',
-          'ABCDEfghijklmnop',
-          'ABCDEFghijklmnop',
-          'ABCDEFGhijklmnop',
-          'ABCDEFGHijklmnop',
-          'ABCDEFGHIjklmnop',
-          'ABCDEFGHIJklmnop',
-          'ABCDEFGHIJKlmnop',
-          'ABCDEFGHIJKLmnop',
-          'ABCDEFGHIJKLMnop',
-          'ABCDEFGHIJKLMnop',
-          'ABCDEFGHIJKLMNop',
-          'ABCDEFGHIJKLMNOp',
-          'ABCDEFGHIJKLMNOP',
-        ];
-
-        // need a bunch of spare random strings per api request
-        spyOn(cryptoUtils, 'randomString').and.returnValues(...insensitiveCollisions);
-      });
-
       it('should not fail on case insensitive matches', async () => {
-        const user1 = await Parse.AnonymousUtils.logIn();
+        spyOn(cryptoUtils, 'randomString').and.returnValue('abcdefghijklmnop');
+        const logIn = id => Parse.User.logInWith('anonymous', { authData: { id } });
+        const user1 = await logIn('test1');
         const username1 = user1.get('username');
 
-        const user2 = await Parse.AnonymousUtils.logIn();
+        cryptoUtils.randomString.and.returnValue('ABCDEFGHIJKLMNOp');
+        const user2 = await logIn('test2');
         const username2 = user2.get('username');
 
         expect(username1).not.toBeUndefined();

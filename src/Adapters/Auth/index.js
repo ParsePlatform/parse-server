@@ -1,4 +1,5 @@
 import loadAdapter from '../AdapterLoader';
+import Parse from 'parse/node';
 
 const apple = require('./apple');
 const gcenter = require('./gcenter');
@@ -24,6 +25,7 @@ const phantauth = require('./phantauth');
 const microsoft = require('./microsoft');
 const keycloak = require('./keycloak');
 const ldap = require('./ldap');
+const webauthn = require('./webauthn');
 
 const anonymous = {
   validateAuthData: () => {
@@ -59,16 +61,52 @@ const providers = {
   microsoft,
   keycloak,
   ldap,
+  webauthn,
 };
 
-function authDataValidator(adapter, appIds, options) {
-  return function (authData) {
-    return adapter.validateAuthData(authData, options).then(() => {
-      if (appIds) {
-        return adapter.validateAppId(appIds, authData, options);
+function authDataValidator(provider, adapter, appIds, options) {
+  return async function (authData, req, user) {
+    if (appIds && typeof adapter.validateAppId === 'function') {
+      await adapter.validateAppId(appIds, authData, options, req, user);
+    }
+    if (typeof adapter.validateAuthData === 'function') {
+      return adapter.validateAuthData(authData, options, req, user);
+    } else if (
+      typeof adapter.validateSetUp === 'function' &&
+      typeof adapter.validateLogin === 'function' &&
+      typeof adapter.validateUpdate === 'function'
+    ) {
+      // We can consider for DX purpose when masterKey is detected, we should
+      // trigger a logged in user
+      const isLoggedIn =
+        (req.auth.user && user && req.auth.user.id === user.id) || (user && req.auth.isMaster);
+      let isUpdate = false;
+      let hasAuthDataConfigured = false;
+
+      if (user && user.get('authData') && user.get('authData')[provider]) {
+        hasAuthDataConfigured = true;
       }
-      return Promise.resolve();
-    });
+
+      if (isLoggedIn && hasAuthDataConfigured) {
+        isUpdate = true;
+      }
+
+      if (isUpdate) {
+        return adapter.validateUpdate(authData, options, req, user);
+      }
+
+      if (!isLoggedIn && hasAuthDataConfigured) {
+        return adapter.validateLogin(authData, options, req, user);
+      }
+
+      if (!hasAuthDataConfigured) {
+        return adapter.validateSetUp(authData, options, req, user);
+      }
+    }
+    throw new Parse.Error(
+      Parse.Error.OTHER_CAUSE,
+      'Adapter not ready, need to implement validateAuthData or (validateSetUp, validateLogin, validateUpdate)'
+    );
   };
 }
 
@@ -94,20 +132,20 @@ function loadAuthAdapter(provider, authOptions) {
   if (providerOptions) {
     const optionalAdapter = loadAdapter(providerOptions, undefined, providerOptions);
     if (optionalAdapter) {
-      ['validateAuthData', 'validateAppId'].forEach(key => {
+      [
+        'validateAuthData',
+        'validateAppId',
+        'validateSetUp',
+        'validateLogin',
+        'validateUpdate',
+        'challenge',
+        'policy',
+      ].forEach(key => {
         if (optionalAdapter[key]) {
           adapter[key] = optionalAdapter[key];
         }
       });
     }
-  }
-
-  // TODO: create a new module from validateAdapter() in
-  // src/Controllers/AdaptableController.js so we can use it here for adapter
-  // validation based on the src/Adapters/Auth/AuthAdapter.js expected class
-  // signature.
-  if (!adapter.validateAuthData || !adapter.validateAppId) {
-    return;
   }
 
   return { adapter, appIds, providerOptions };
@@ -121,12 +159,12 @@ module.exports = function (authOptions = {}, enableAnonymousUsers = true) {
   // To handle the test cases on configuration
   const getValidatorForProvider = function (provider) {
     if (provider === 'anonymous' && !_enableAnonymousUsers) {
-      return;
+      return { validator: undefined };
     }
 
     const { adapter, appIds, providerOptions } = loadAuthAdapter(provider, authOptions);
 
-    return authDataValidator(adapter, appIds, providerOptions);
+    return { validator: authDataValidator(provider, adapter, appIds, providerOptions), adapter };
   };
 
   return Object.freeze({

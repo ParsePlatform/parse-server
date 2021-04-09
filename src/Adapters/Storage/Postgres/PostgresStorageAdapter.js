@@ -274,7 +274,6 @@ const buildWhereClause = ({ schema, query, index, caseInsensitive }): WhereClaus
         continue;
       }
     }
-
     const authDataMatch = fieldName.match(/^_auth_data_([a-zA-Z0-9_]+)$/);
     if (authDataMatch) {
       // TODO: Handle querying by _auth_data_provider, authData is stored in authData field
@@ -1277,15 +1276,20 @@ export class PostgresStorageAdapter implements StorageAdapter {
         return;
       }
       var authDataMatch = fieldName.match(/^_auth_data_([a-zA-Z0-9_]+)$/);
+      const authDataAlreadyExists = !!object['authData'];
       if (authDataMatch) {
         var provider = authDataMatch[1];
         object['authData'] = object['authData'] || {};
         object['authData'][provider] = object[fieldName];
         delete object[fieldName];
         fieldName = 'authData';
+        // Avoid pushing authData multiple times to the
+        // postgres query
+        if (authDataAlreadyExists) return;
       }
 
       columnsArray.push(fieldName);
+
       if (!schema.fields[fieldName] && className === '_User') {
         if (
           fieldName === '_email_verify_token' ||
@@ -1762,7 +1766,6 @@ export class PostgresStorageAdapter implements StorageAdapter {
       caseInsensitive,
     });
     values.push(...where.values);
-
     const wherePattern = where.pattern.length > 0 ? `WHERE ${where.pattern}` : '';
     const limitPattern = hasLimit ? `LIMIT $${values.length + 1}` : '';
     if (hasLimit) {

@@ -10,6 +10,7 @@ import passwordCrypto from '../password';
 import { maybeRunTrigger, Types as TriggerTypes } from '../triggers';
 import { promiseEnsureIdempotency } from '../middlewares';
 import RestWrite from '../RestWrite';
+import { logger } from '../../lib/Adapters/Logger/WinstonLogger';
 
 export class UsersRouter extends ClassesRouter {
   className() {
@@ -165,7 +166,6 @@ export class UsersRouter extends ClassesRouter {
 
           // Remove hidden properties.
           UsersRouter.removeHiddenProperties(user);
-
           return { response: user };
         }
       });
@@ -173,6 +173,17 @@ export class UsersRouter extends ClassesRouter {
 
   async handleLogIn(req) {
     const user = await this._authenticateUserFromRequest(req);
+    const authData = req.body && req.body.authData;
+    // Check if user has provided his required auth providers
+    Auth.checkIfUserHasProvidedConfiguredProvidersForLogin(authData, user.authData, req.config);
+
+    let authDataResponse;
+    let validatedAuthData;
+    if (authData) {
+      const res = await Auth.handleAuthDataValidation(authData, req, user);
+      authDataResponse = res.authDataResponse;
+      validatedAuthData = res.authData;
+    }
 
     // handle password expiry policy
     if (req.config.passwordPolicy && req.config.passwordPolicy.maxPasswordAge) {
@@ -219,6 +230,17 @@ export class UsersRouter extends ClassesRouter {
       req.config
     );
 
+    // If we have some new validated authData
+    // update directly
+    if (validatedAuthData && Object.keys(validatedAuthData).length) {
+      await req.config.database.update(
+        '_User',
+        { objectId: user.objectId },
+        { authData: validatedAuthData },
+        {}
+      );
+    }
+
     const { sessionData, createSession } = RestWrite.createSession(req.config, {
       userId: user.objectId,
       createdWith: {
@@ -240,6 +262,10 @@ export class UsersRouter extends ClassesRouter {
       null,
       req.config
     );
+
+    if (authDataResponse) {
+      user.authDataResponse = authDataResponse;
+    }
 
     return { response: user };
   }
@@ -393,6 +419,94 @@ export class UsersRouter extends ClassesRouter {
     });
   }
 
+  async handleChallenge(req) {
+    const { username, email, password, authData, challengeData } = req.body;
+
+    // if username or email provided with password try to find the user with default
+    // system
+    let user;
+    if (username || email) {
+      if (!password)
+        throw new Parse.Error(
+          Parse.Error.OTHER_CAUSE,
+          'You provided username or email, you need to also provide password.'
+        );
+      user = await this._authenticateUserFromRequest(req);
+    }
+
+    if (!challengeData) throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'Nothing to challenge.');
+
+    if (typeof challengeData !== 'object')
+      throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'challengeData should be an object.');
+
+    // Try to find user by authData
+    if (authData) {
+      if (typeof authData !== 'object')
+        throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'authData should be an object.');
+      // To avoid security issue we should only support one identifying method
+      if (user)
+        throw new Parse.Error(
+          Parse.Error.OTHER_CAUSE,
+          'You cant provide username/email and authData, only use one identification method.'
+        );
+
+      if (Object.keys(authData).filter(key => authData[key].id).length > 1) {
+        throw new Parse.Error(
+          Parse.Error.OTHER_CAUSE,
+          'You cant provide more than one authData provider with an id.'
+        );
+      }
+
+      const results = await Auth.findUsersWithAuthData(req.config, authData);
+
+      try {
+        if (!results[0] || results.length > 1)
+          throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'User not found.');
+
+        // Find the provider used to find the user
+        const provider = Object.keys(authData).find(key => authData[key].id);
+
+        // Validate authData used to identify the user
+        // to avoid guess id attack
+        const { validator } = req.config.authDataManager.getValidatorForProvider(provider);
+        await validator(
+          authData[provider],
+          { config: req.config, auth: req.auth, isChallenge: true },
+          Parse.User.fromJSON({ className: '_User', ...results[0] })
+        );
+        user = results[0];
+      } catch (e) {
+        // Rewrite the error to avoid guess id attack
+        logger.error(e);
+        throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'User not found.');
+      }
+    }
+
+    // Execute challenge step by step
+    // with consistent order
+    const challenge = await Auth.reducePromise(
+      Object.keys(challengeData).sort(),
+      async (acc, provider) => {
+        const challengeHandler = req.config.authDataManager.getValidatorForProvider(provider)
+          .adapter.challenge;
+        if (typeof challengeHandler === 'function') {
+          acc[provider] =
+            (await challengeHandler(
+              challengeData[provider],
+              authData && authData[provider],
+              req.config.auth[provider],
+              req,
+              user ? Parse.User.fromJSON({ className: '_User', ...user }) : undefined
+            )) || true;
+          return acc;
+        }
+      },
+      {}
+    );
+
+    return { response: Object.keys(challenge).length ? { challengeData: challenge } : undefined };
+  }
+
   mountRoutes() {
     this.route('GET', '/users', req => {
       return this.handleFind(req);
@@ -429,6 +543,9 @@ export class UsersRouter extends ClassesRouter {
     });
     this.route('GET', '/verifyPassword', req => {
       return this.handleVerifyPassword(req);
+    });
+    this.route('POST', '/challenge', req => {
+      return this.handleChallenge(req);
     });
   }
 }

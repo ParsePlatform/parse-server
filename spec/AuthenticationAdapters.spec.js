@@ -3,6 +3,8 @@ const Config = require('../lib/Config');
 const defaultColumns = require('../lib/Controllers/SchemaController').defaultColumns;
 const authenticationLoader = require('../lib/Adapters/Auth');
 const path = require('path');
+const { sign } = require('jsonwebtoken');
+
 const responses = {
   gpgames: { playerId: 'userId' },
   instagram: { id: 'userId' },
@@ -339,7 +341,7 @@ describe('AuthenticationProviders', function () {
     });
 
     validateAuthenticationHandler(authenticationHandler);
-    const validator = authenticationHandler.getValidatorForProvider('customAuthentication');
+    const { validator } = authenticationHandler.getValidatorForProvider('customAuthentication');
     validateValidator(validator);
 
     validator(validAuthData).then(
@@ -362,7 +364,7 @@ describe('AuthenticationProviders', function () {
     });
 
     validateAuthenticationHandler(authenticationHandler);
-    const validator = authenticationHandler.getValidatorForProvider('customAuthentication');
+    const { validator } = authenticationHandler.getValidatorForProvider('customAuthentication');
     validateValidator(validator);
 
     validator({
@@ -387,7 +389,7 @@ describe('AuthenticationProviders', function () {
     });
 
     validateAuthenticationHandler(authenticationHandler);
-    const validator = authenticationHandler.getValidatorForProvider('customAuthentication');
+    const { validator } = authenticationHandler.getValidatorForProvider('customAuthentication');
     validateValidator(validator);
 
     validator({
@@ -2138,5 +2140,1248 @@ describe('facebook limited auth adapter', () => {
     } catch (e) {
       expect(e.message).toBe('auth data is invalid for this user.');
     }
+  });
+});
+
+describe('Auth Adapter features', () => {
+  const baseAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve(),
+  };
+  const baseAdapter2 = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve(),
+    options: { anOption: true },
+  };
+
+  const doNotSaveAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve({ doNotSave: true }),
+  };
+
+  const additionalAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve(),
+    policy: 'additional',
+  };
+
+  const soloAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve(),
+    policy: 'solo',
+  };
+
+  const challengeAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateAuthData: () => Promise.resolve(),
+    challenge: () => Promise.resolve({ token: 'test' }),
+    options: {
+      anOption: true,
+    },
+  };
+
+  const modernAdapter = {
+    validateAppId: () => Promise.resolve(),
+    validateSetUp: () => Promise.resolve(),
+    validateUpdate: () => Promise.resolve(),
+    validateLogin: () => Promise.resolve(),
+  };
+
+  const wrongAdapter = {
+    validateAppId: () => Promise.resolve(),
+  };
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Parse-Application-Id': 'test',
+    'X-Parse-REST-API-Key': 'rest',
+  };
+
+  it('should ensure no duplicate auth data id after before save', async () => {
+    await reconfigureServer({
+      auth: { baseAdapter },
+      cloud: () => {
+        Parse.Cloud.beforeSave('_User', async request => {
+          request.object.set('authData', { baseAdapter: { id: 'test' } });
+        });
+      },
+    });
+
+    const user = new Parse.User();
+    await user.save({ authData: { baseAdapter: { id: 'another' } } });
+    await user.fetch({ useMasterKey: true });
+    expect(user.get('authData')).toEqual({ baseAdapter: { id: 'test' } });
+
+    const user2 = new Parse.User();
+    try {
+      await user2.save({ authData: { baseAdapter: { id: 'another' } } });
+      fail();
+    } catch (e) {
+      expect(e.message).toContain('this auth is already used');
+    }
+  });
+
+  it('should pass authData, options, req, user to validateAuthData', async () => {
+    spyOn(baseAdapter, 'validateAuthData').and.resolveTo({});
+    await reconfigureServer({ auth: { baseAdapter } });
+
+    const user = new Parse.User();
+
+    const payload = { someData: true };
+
+    await user.save({
+      username: 'test',
+      password: 'password',
+      authData: { baseAdapter: payload },
+    });
+
+    expect(user.getSessionToken()).toBeDefined();
+
+    const firstCall = baseAdapter.validateAuthData.calls.argsFor(0);
+    expect(firstCall[0]).toEqual(payload);
+    expect(firstCall[1]).toEqual(baseAdapter);
+    expect(firstCall[2].config).toBeDefined();
+    expect(firstCall[2].isChallenge).toBeUndefined();
+    expect(firstCall[2].config.headers).toBeDefined();
+    expect(firstCall[2].auth).toBeDefined();
+    expect(firstCall[3]).toBeUndefined();
+
+    // Use request sine JS SDK not ready
+    await request({
+      headers: headers,
+      method: 'POST',
+      url: 'http://localhost:8378/1/login',
+      body: JSON.stringify({
+        username: 'test',
+        password: 'password',
+        authData: { baseAdapter: payload },
+      }),
+    });
+    const secondCall = baseAdapter.validateAuthData.calls.argsFor(1);
+    expect(secondCall[0]).toEqual(payload);
+    expect(secondCall[1]).toEqual(baseAdapter);
+    expect(secondCall[2].config).toBeDefined();
+    expect(secondCall[2].isChallenge).toBeUndefined();
+    expect(secondCall[2].auth).toBeDefined();
+    expect(secondCall[2].config.headers).toBeDefined();
+    expect(secondCall[3] instanceof Parse.User).toBeTruthy();
+    expect(secondCall[3].id).toEqual(user.id);
+  });
+
+  it('should trigger correctly validateSetUp', async () => {
+    spyOn(modernAdapter, 'validateSetUp').and.resolveTo({});
+    spyOn(modernAdapter, 'validateUpdate').and.resolveTo({});
+    spyOn(modernAdapter, 'validateLogin').and.resolveTo({});
+
+    await reconfigureServer({ auth: { modernAdapter } });
+    const user = new Parse.User();
+
+    await user.save({ authData: { modernAdapter: { id: 'modernAdapter' } } });
+
+    expect(modernAdapter.validateUpdate).toHaveBeenCalledTimes(0);
+    expect(modernAdapter.validateLogin).toHaveBeenCalledTimes(0);
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+    const call = modernAdapter.validateSetUp.calls.argsFor(0);
+    expect(call[0]).toEqual({ id: 'modernAdapter' });
+    expect(call[1]).toEqual(modernAdapter);
+    expect(call[2].config).toBeDefined();
+    expect(call[2].isChallenge).toBeUndefined();
+    expect(call[2].auth).toBeDefined();
+    expect(call[2].config.headers).toBeDefined();
+    expect(call[3]).toBeUndefined();
+    expect(user.getSessionToken()).toBeDefined();
+  });
+  it('should trigger correctly validateLogin', async () => {
+    spyOn(modernAdapter, 'validateSetUp').and.resolveTo({});
+    spyOn(modernAdapter, 'validateUpdate').and.resolveTo({});
+    spyOn(modernAdapter, 'validateLogin').and.resolveTo({});
+
+    await reconfigureServer({ auth: { modernAdapter } });
+    const user = new Parse.User();
+
+    // Signup
+    await user.save({ authData: { modernAdapter: { id: 'modernAdapter' } } });
+
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+    // Login
+    const user2 = new Parse.User();
+    await user2.save({ authData: { modernAdapter: { id: 'modernAdapter' } } });
+
+    expect(modernAdapter.validateUpdate).toHaveBeenCalledTimes(0);
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+    expect(modernAdapter.validateLogin).toHaveBeenCalledTimes(1);
+    const call = modernAdapter.validateLogin.calls.argsFor(0);
+    expect(call[0]).toEqual({ id: 'modernAdapter' });
+    expect(call[1]).toEqual(modernAdapter);
+    expect(call[2].config).toBeDefined();
+    expect(call[2].isChallenge).toBeUndefined();
+    expect(call[2].auth).toBeDefined();
+    expect(call[2].config.headers).toBeDefined();
+    expect(call[3] instanceof Parse.User).toBeTruthy();
+    expect(call[3].id).toEqual(user2.id);
+    expect(call[3].id).toEqual(user.id);
+    expect(user2.getSessionToken()).toBeDefined();
+  });
+  it('should trigger correctly validateUpdate', async () => {
+    spyOn(modernAdapter, 'validateSetUp').and.resolveTo({});
+    spyOn(modernAdapter, 'validateUpdate').and.resolveTo({});
+    spyOn(modernAdapter, 'validateLogin').and.resolveTo({});
+
+    await reconfigureServer({ auth: { modernAdapter } });
+    const user = new Parse.User();
+
+    // Signup
+    await user.save({ authData: { modernAdapter: { id: 'modernAdapter' } } });
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+
+    // Save same data
+    await user.save(
+      { authData: { modernAdapter: { id: 'modernAdapter' } } },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    // Save same data with master key
+    await user.save(
+      { authData: { modernAdapter: { id: 'modernAdapter' } } },
+      { useMasterKey: true }
+    );
+
+    expect(modernAdapter.validateUpdate).toHaveBeenCalledTimes(0);
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+    expect(modernAdapter.validateLogin).toHaveBeenCalledTimes(0);
+
+    // Change authData
+    await user.save(
+      { authData: { modernAdapter: { id: 'modernAdapter2' } } },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    expect(modernAdapter.validateUpdate).toHaveBeenCalledTimes(1);
+    expect(modernAdapter.validateSetUp).toHaveBeenCalledTimes(1);
+    expect(modernAdapter.validateLogin).toHaveBeenCalledTimes(0);
+    const call = modernAdapter.validateUpdate.calls.argsFor(0);
+    expect(call[0]).toEqual({ id: 'modernAdapter2' });
+    expect(call[1]).toEqual(modernAdapter);
+    expect(call[2].config).toBeDefined();
+    expect(call[2].isChallenge).toBeUndefined();
+    expect(call[2].auth).toBeDefined();
+    expect(call[2].config.headers).toBeDefined();
+    expect(call[3] instanceof Parse.User).toBeTruthy();
+    expect(call[3].id).toEqual(user.id);
+    expect(user.getSessionToken()).toBeDefined();
+  });
+  it('should throw if no triggers found', async () => {
+    await reconfigureServer({ auth: { wrongAdapter } });
+    const user = new Parse.User();
+    try {
+      await user.save({ authData: { wrongAdapter: { id: 'wrongAdapter' } } });
+      fail('should throw');
+    } catch (e) {
+      expect(e.message).toContain(
+        'Adapter not ready, need to implement validateAuthData or (validateSetUp, validateLogin, validateUpdate)'
+      );
+    }
+  });
+  it('should not update authData if provider return doNotSave', async () => {
+    spyOn(doNotSaveAdapter, 'validateAuthData').and.resolveTo({ doNotSave: true });
+    await reconfigureServer({
+      auth: { doNotSaveAdapter, baseAdapter },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      authData: { baseAdapter: { id: 'baseAdapter' }, doNotSaveAdapter: { token: true } },
+    });
+
+    await user.fetch({ useMasterKey: true });
+
+    expect(user.get('authData')).toEqual({ baseAdapter: { id: 'baseAdapter' } });
+  });
+  it('should perform authData validation only when its required', async () => {
+    spyOn(baseAdapter2, 'validateAuthData').and.resolveTo({});
+    spyOn(baseAdapter, 'validateAuthData').and.resolveTo({});
+    await reconfigureServer({
+      auth: { baseAdapter2, baseAdapter },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { token: true },
+      },
+    });
+
+    expect(baseAdapter2.validateAuthData).toHaveBeenCalledTimes(1);
+
+    const user2 = new Parse.User();
+    await user2.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+      },
+    });
+
+    expect(baseAdapter2.validateAuthData).toHaveBeenCalledTimes(1);
+
+    const user3 = new Parse.User();
+    await user3.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { token: true },
+      },
+    });
+
+    expect(baseAdapter2.validateAuthData).toHaveBeenCalledTimes(2);
+  });
+  it('should require additional provider if configured', async () => {
+    await reconfigureServer({
+      auth: { baseAdapter, additionalAdapter },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        additionalAdapter: { token: true },
+      },
+    });
+
+    const user2 = new Parse.User();
+    try {
+      await user2.save({
+        authData: {
+          baseAdapter: { id: 'baseAdapter' },
+        },
+      });
+      fail('should require additional authData');
+    } catch (e) {
+      expect(e.message).toContain('Missing additional authData additionalAdapter');
+      expect(user2.getSessionToken()).toBeUndefined();
+    }
+
+    await user2.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        additionalAdapter: { token: true },
+      },
+    });
+
+    expect(user2.getSessionToken()).toBeDefined();
+  });
+  it('should skip additional provider if used provider is solo', async () => {
+    await reconfigureServer({
+      auth: { soloAdapter, additionalAdapter },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      authData: {
+        soloAdapter: { id: 'soloAdapter' },
+        additionalAdapter: { token: true },
+      },
+    });
+
+    const user2 = new Parse.User();
+    await user2.save({
+      authData: {
+        soloAdapter: { id: 'soloAdapter' },
+      },
+    });
+    expect(user2.getSessionToken()).toBeDefined();
+  });
+  it('should return authData response and save some info on non username login', async () => {
+    spyOn(baseAdapter, 'validateAuthData').and.resolveTo({
+      response: { someData: true },
+    });
+    spyOn(baseAdapter2, 'validateAuthData').and.resolveTo({
+      response: { someData2: true },
+      save: { otherData: true },
+    });
+    await reconfigureServer({
+      auth: { baseAdapter, baseAdapter2 },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { test: true },
+      },
+    });
+
+    expect(user.get('authDataResponse')).toEqual({
+      baseAdapter: { someData: true },
+      baseAdapter2: { someData2: true },
+    });
+
+    const user2 = new Parse.User();
+    user2.id = user.id;
+    await user2.save(
+      {
+        authData: {
+          baseAdapter: { id: 'baseAdapter' },
+          baseAdapter2: { test: true },
+        },
+      },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    expect(user2.get('authDataResponse')).toEqual({ baseAdapter2: { someData2: true } });
+
+    const user3 = new Parse.User();
+    await user3.save({
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { test: true },
+      },
+    });
+
+    // On logIn all authData are revalidated
+    expect(user3.get('authDataResponse')).toEqual({
+      baseAdapter: { someData: true },
+      baseAdapter2: { someData2: true },
+    });
+
+    const userViaMasterKey = new Parse.User();
+    userViaMasterKey.id = user2.id;
+    await userViaMasterKey.fetch({ useMasterKey: true });
+    expect(userViaMasterKey.get('authData')).toEqual({
+      baseAdapter: { id: 'baseAdapter' },
+      baseAdapter2: { otherData: true },
+    });
+  });
+  it('should return authData response and save some info on username login', async () => {
+    spyOn(baseAdapter, 'validateAuthData').and.resolveTo({
+      response: { someData: true },
+    });
+    spyOn(baseAdapter2, 'validateAuthData').and.resolveTo({
+      response: { someData2: true },
+      save: { otherData: true },
+    });
+    await reconfigureServer({
+      auth: { baseAdapter, baseAdapter2 },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      username: 'username',
+      password: 'password',
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { test: true },
+      },
+    });
+
+    expect(user.get('authDataResponse')).toEqual({
+      baseAdapter: { someData: true },
+      baseAdapter2: { someData2: true },
+    });
+
+    const res = await request({
+      headers: headers,
+      method: 'POST',
+      url: 'http://localhost:8378/1/login',
+      body: JSON.stringify({
+        username: 'username',
+        password: 'password',
+        authData: {
+          baseAdapter2: { test: true },
+          baseAdapter: { id: 'baseAdapter' },
+        },
+      }),
+    });
+    const result = JSON.parse(res.text);
+    expect(result.authDataResponse).toEqual({
+      baseAdapter2: { someData2: true },
+      baseAdapter: { someData: true },
+    });
+
+    await user.fetch({ useMasterKey: true });
+    expect(user.get('authData')).toEqual({
+      baseAdapter: { id: 'baseAdapter' },
+      baseAdapter2: { otherData: true },
+    });
+  });
+  it('should allow update of authData', async () => {
+    spyOn(baseAdapter, 'validateAuthData').and.resolveTo({
+      response: { someData: true },
+    });
+    spyOn(baseAdapter2, 'validateAuthData').and.resolveTo({
+      response: { someData2: true },
+      save: { otherData: true },
+    });
+    await reconfigureServer({
+      auth: { baseAdapter, baseAdapter2 },
+    });
+    await reconfigureServer({
+      auth: { baseAdapter, baseAdapter2 },
+    });
+
+    const user = new Parse.User();
+
+    await user.save({
+      username: 'username',
+      password: 'password',
+      authData: {
+        baseAdapter: { id: 'baseAdapter' },
+        baseAdapter2: { test: true },
+      },
+    });
+    expect(baseAdapter.validateAuthData).toHaveBeenCalledTimes(1);
+
+    expect(user.id).toBeDefined();
+    expect(user.getSessionToken()).toBeDefined();
+    // Should not re validate the baseAdapter
+    // when user is already logged in and authData not changed
+    await user.save(
+      {
+        authData: {
+          baseAdapter2: { test: true },
+          baseAdapter: { id: 'baseAdapter' },
+        },
+      },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    expect(baseAdapter.validateAuthData).toHaveBeenCalledTimes(1);
+
+    // Should not re validate the baseAdapter
+    // when master key used and authData are not changed
+    await user.save(
+      {
+        authData: {
+          baseAdapter2: { test: true },
+          baseAdapter: { id: 'baseAdapter' },
+        },
+      },
+      { useMasterKey: true }
+    );
+
+    expect(baseAdapter.validateAuthData).toHaveBeenCalledTimes(1);
+
+    // Should allow user to change authData
+    await user.save(
+      {
+        authData: {
+          baseAdapter2: { test: true },
+          baseAdapter: { id: 'baseAdapter2' },
+        },
+      },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    expect(baseAdapter.validateAuthData).toHaveBeenCalledTimes(2);
+
+    // Should allow master key to change authData
+    await user.save(
+      {
+        authData: {
+          baseAdapter2: { test: true },
+          baseAdapter: { id: 'baseAdapter3' },
+        },
+      },
+      { useMasterKey: true }
+    );
+
+    expect(baseAdapter.validateAuthData).toHaveBeenCalledTimes(3);
+
+    await user.fetch({ useMasterKey: true });
+    expect(user.get('authData')).toEqual({
+      baseAdapter: { id: 'baseAdapter3' },
+      baseAdapter2: { otherData: true },
+    });
+  });
+  it('should pass user to auth adapter on update by matching session', async () => {
+    spyOn(baseAdapter2, 'validateAuthData').and.resolveTo({});
+    await reconfigureServer({ auth: { baseAdapter2 } });
+
+    const user = new Parse.User();
+
+    const payload = { someData: true };
+
+    await user.save({
+      username: 'test',
+      password: 'password',
+    });
+
+    expect(user.getSessionToken()).toBeDefined();
+
+    await user.save(
+      { authData: { baseAdapter2: payload } },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    const firstCall = baseAdapter2.validateAuthData.calls.argsFor(0);
+    expect(firstCall[0]).toEqual(payload);
+    expect(firstCall[1]).toEqual(baseAdapter2);
+    expect(firstCall[2].config).toBeDefined();
+    expect(firstCall[2].isChallenge).toBeUndefined();
+    expect(firstCall[2].auth).toBeDefined();
+    expect(firstCall[2].config.headers).toBeDefined();
+    expect(firstCall[3] instanceof Parse.User).toBeTruthy();
+    expect(firstCall[3].id).toEqual(user.id);
+
+    await user.save({ authData: { baseAdapter2: payload } }, { useMasterKey: true });
+
+    const secondCall = baseAdapter2.validateAuthData.calls.argsFor(1);
+    expect(secondCall[0]).toEqual(payload);
+    expect(secondCall[1]).toEqual(baseAdapter2);
+    expect(secondCall[2].config).toBeDefined();
+    expect(secondCall[2].isChallenge).toBeUndefined();
+    expect(secondCall[2].auth).toBeDefined();
+    expect(secondCall[2].config.headers).toBeDefined();
+    expect(secondCall[3] instanceof Parse.User).toBeTruthy();
+    expect(secondCall[3].id).toEqual(user.id);
+  });
+  it('should return challenge with no logged user', async () => {
+    spyOn(challengeAdapter, 'challenge').and.resolveTo({ token: 'test' });
+
+    await reconfigureServer({
+      auth: { challengeAdapter },
+    });
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: {},
+      });
+      fail('should throw Nothing to challenge.');
+    } catch (e) {
+      expect(e.text).toContain('Nothing to challenge.');
+    }
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: { challengeData: true },
+      });
+      fail('should throw challengeData should be an object.');
+    } catch (e) {
+      expect(e.text).toContain('challengeData should be an object.');
+    }
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: { challengeData: { data: true }, authData: true },
+      });
+      fail('should throw authData should be an object.');
+    } catch (e) {
+      expect(e.text).toContain('authData should be an object.');
+    }
+
+    const res = await request({
+      headers: headers,
+      method: 'POST',
+      url: 'http://localhost:8378/1/challenge',
+      body: JSON.stringify({
+        challengeData: {
+          challengeAdapter: { someData: true },
+        },
+      }),
+    });
+
+    expect(JSON.parse(res.text)).toEqual({
+      challengeData: {
+        challengeAdapter: {
+          token: 'test',
+        },
+      },
+    });
+    const challengeCall = challengeAdapter.challenge.calls.argsFor(0);
+    expect(challengeAdapter.challenge).toHaveBeenCalledTimes(1);
+    expect(challengeCall[0]).toEqual({ someData: true });
+    expect(challengeCall[1]).toBeUndefined();
+    expect(challengeCall[2]).toEqual(challengeAdapter);
+    expect(challengeCall[3].config).toBeDefined();
+    expect(challengeCall[3].auth).toBeDefined();
+    expect(challengeCall[3].config.headers).toBeDefined();
+    expect(challengeCall[4]).toBeUndefined();
+  });
+  it('should return challenge with username created user', async () => {
+    spyOn(challengeAdapter, 'challenge').and.resolveTo({ token: 'test' });
+
+    await reconfigureServer({
+      auth: { challengeAdapter },
+    });
+
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password' });
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          username: 'username',
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+        }),
+      });
+      fail('should throw You provided username or email, you need to also provide password.');
+    } catch (e) {
+      expect(e.text).toContain(
+        'You provided username or email, you need to also provide password.'
+      );
+    }
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          username: 'username',
+          password: 'password',
+          authData: { data: true },
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+        }),
+      });
+      fail(
+        'should throw You cant provide username/email and authData, only use one identification method.'
+      );
+    } catch (e) {
+      expect(e.text).toContain(
+        'You cant provide username/email and authData, only use one identification method.'
+      );
+    }
+
+    const res = await request({
+      headers: headers,
+      method: 'POST',
+      url: 'http://localhost:8378/1/challenge',
+      body: JSON.stringify({
+        username: 'username',
+        password: 'password',
+        challengeData: {
+          challengeAdapter: { someData: true },
+        },
+      }),
+    });
+
+    expect(JSON.parse(res.text)).toEqual({
+      challengeData: {
+        challengeAdapter: {
+          token: 'test',
+        },
+      },
+    });
+
+    const challengeCall = challengeAdapter.challenge.calls.argsFor(0);
+    expect(challengeAdapter.challenge).toHaveBeenCalledTimes(1);
+    expect(challengeCall[0]).toEqual({ someData: true });
+    expect(challengeCall[1]).toEqual(undefined);
+    expect(challengeCall[2]).toEqual(challengeAdapter);
+    expect(challengeCall[3].config).toBeDefined();
+    expect(challengeCall[3].auth).toBeDefined();
+    expect(challengeCall[3].config.headers).toBeDefined();
+    expect(challengeCall[4] instanceof Parse.User).toBeTruthy();
+    expect(challengeCall[4].id).toEqual(user.id);
+  });
+  it('should return challenge with authData created user', async () => {
+    spyOn(challengeAdapter, 'challenge').and.resolveTo({ token: 'test' });
+    spyOn(challengeAdapter, 'validateAuthData').and.callThrough();
+
+    await reconfigureServer({
+      auth: { challengeAdapter, soloAdapter },
+    });
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+          authData: {
+            challengeAdapter: { id: 'challengeAdapter' },
+          },
+        }),
+      });
+      fail();
+    } catch (e) {
+      expect(e.text).toContain('User not found.');
+    }
+
+    const user = new Parse.User();
+    await user.save({ authData: { challengeAdapter: { id: 'challengeAdapter' } } });
+
+    const user2 = new Parse.User();
+    await user2.save({ authData: { soloAdapter: { id: 'soloAdapter' } } });
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+          authData: {
+            challengeAdapter: { id: 'challengeAdapter' },
+            soloAdapter: { id: 'soloAdapter' },
+          },
+        }),
+      });
+      fail();
+    } catch (e) {
+      expect(e.text).toContain('You cant provide more than one authData provider with an id.');
+    }
+
+    const res = await request({
+      headers: headers,
+      method: 'POST',
+      url: 'http://localhost:8378/1/challenge',
+      body: JSON.stringify({
+        challengeData: {
+          challengeAdapter: { someData: true },
+        },
+        authData: {
+          challengeAdapter: { id: 'challengeAdapter' },
+        },
+      }),
+    });
+
+    expect(JSON.parse(res.text)).toEqual({
+      challengeData: {
+        challengeAdapter: {
+          token: 'test',
+        },
+      },
+    });
+
+    const validateCall = challengeAdapter.validateAuthData.calls.argsFor(1);
+    expect(validateCall[2].isChallenge).toBeTruthy();
+
+    const challengeCall = challengeAdapter.challenge.calls.argsFor(0);
+    expect(challengeAdapter.challenge).toHaveBeenCalledTimes(1);
+    expect(challengeCall[0]).toEqual({ someData: true });
+    expect(challengeCall[1]).toEqual({ id: 'challengeAdapter' });
+    expect(challengeCall[2]).toEqual(challengeAdapter);
+    expect(challengeCall[3].config).toBeDefined();
+    expect(challengeCall[3].auth).toBeDefined();
+    expect(challengeCall[3].config.headers).toBeDefined();
+    expect(challengeCall[4] instanceof Parse.User).toBeTruthy();
+    expect(challengeCall[4].id).toEqual(user.id);
+  });
+  it('should validate provided authData and prevent guess id attack', async () => {
+    spyOn(challengeAdapter, 'challenge').and.resolveTo({ token: 'test' });
+
+    await reconfigureServer({
+      auth: { challengeAdapter, soloAdapter },
+    });
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+          authData: {
+            challengeAdapter: { id: 'challengeAdapter' },
+          },
+        }),
+      });
+      fail();
+    } catch (e) {
+      expect(e.text).toContain('User not found.');
+    }
+
+    const user = new Parse.User();
+    await user.save({ authData: { challengeAdapter: { id: 'challengeAdapter' } } });
+
+    spyOn(challengeAdapter, 'validateAuthData').and.rejectWith({});
+
+    try {
+      await request({
+        headers: headers,
+        method: 'POST',
+        url: 'http://localhost:8378/1/challenge',
+        body: JSON.stringify({
+          challengeData: {
+            challengeAdapter: { someData: true },
+          },
+          authData: {
+            challengeAdapter: { id: 'challengeAdapter' },
+          },
+        }),
+      });
+      fail();
+    } catch (e) {
+      expect(e.text).toContain('User not found.');
+    }
+
+    const validateCall = challengeAdapter.validateAuthData.calls.argsFor(0);
+    expect(challengeAdapter.validateAuthData).toHaveBeenCalledTimes(1);
+    expect(validateCall[0]).toEqual({ id: 'challengeAdapter' });
+    expect(validateCall[1]).toEqual(challengeAdapter);
+    expect(validateCall[2].config).toBeDefined();
+    expect(validateCall[2].isChallenge).toBeTruthy();
+    expect(validateCall[2].auth).toBeDefined();
+    expect(validateCall[2].config.headers).toBeDefined();
+    expect(validateCall[3] instanceof Parse.User).toBeTruthy();
+    expect(validateCall[3].id).toEqual(user.id);
+  });
+});
+
+describe('Webauthn', () => {
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Parse-Application-Id': 'test',
+    'X-Parse-REST-API-Key': 'rest',
+  };
+
+  const clientAttestation = {
+    id: 'VHzbxaYaJu2P8m1Y2iHn2gRNHrgK0iYbn9E978L3Qi7Q-chFeicIHwYCRophz5lth2nCgEVKcgWirxlgidgbUQ',
+    rawId: 'VHzbxaYaJu2P8m1Y2iHn2gRNHrgK0iYbn9E978L3Qi7Q-chFeicIHwYCRophz5lth2nCgEVKcgWirxlgidgbUQ',
+    response: {
+      attestationObject:
+        'o2NmbXRoZmlkby11MmZnYXR0U3RtdKJjc2lnWEcwRQIgRYUftNUmhT0VWTZmIgDmrOoP26Pcre-kL3DLnCrXbegCIQCOu_x5gqp-Rej76zeBuXlk8e7J-9WM_i-wZmCIbIgCGmN4NWOBWQLBMIICvTCCAaWgAwIBAgIEKudiYzANBgkqhkiG9w0BAQsFADAuMSwwKgYDVQQDEyNZdWJpY28gVTJGIFJvb3QgQ0EgU2VyaWFsIDQ1NzIwMDYzMTAgFw0xNDA4MDEwMDAwMDBaGA8yMDUwMDkwNDAwMDAwMFowbjELMAkGA1UEBhMCU0UxEjAQBgNVBAoMCVl1YmljbyBBQjEiMCAGA1UECwwZQXV0aGVudGljYXRvciBBdHRlc3RhdGlvbjEnMCUGA1UEAwweWXViaWNvIFUyRiBFRSBTZXJpYWwgNzE5ODA3MDc1MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEKgOGXmBD2Z4R_xCqJVRXhL8Jr45rHjsyFykhb1USGozZENOZ3cdovf5Ke8fj2rxi5tJGn_VnW4_6iQzKdIaeP6NsMGowIgYJKwYBBAGCxAoCBBUxLjMuNi4xLjQuMS40MTQ4Mi4xLjEwEwYLKwYBBAGC5RwCAQEEBAMCBDAwIQYLKwYBBAGC5RwBAQQEEgQQbUS6m_bsLkm5MAyP6SDLczAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQByV9A83MPhFWmEkNb4DvlbUwcjc9nmRzJjKxHc3HeK7GvVkm0H4XucVDB4jeMvTke0WHb_jFUiApvpOHh5VyMx5ydwFoKKcRs5x0_WwSWL0eTZ5WbVcHkDR9pSNcA_D_5AsUKOBcbpF5nkdVRxaQHuuIuwV4k1iK2IqtMNcU8vL6w21U261xCcWwJ6sMq4zzVO8QCKCQhsoIaWrwz828GDmPzfAjFsJiLJXuYivdHACkeJ5KHMt0mjVLpfJ2BCML7_rgbmvwL7wBW80VHfNdcKmKjkLcpEiPzwcQQhiN_qHV90t-p4iyr5xRSpurlP5zic2hlRkLKxMH2_kRjhqSn4aGF1dGhEYXRhWMQ93EcQ6cCIsinbqJ1WMiC7Ofcimv9GWwplaxr7mor4oEEAAAAAAAAAAAAAAAAAAAAAAAAAAABAVHzbxaYaJu2P8m1Y2iHn2gRNHrgK0iYbn9E978L3Qi7Q-chFeicIHwYCRophz5lth2nCgEVKcgWirxlgidgbUaUBAgMmIAEhWCDIkcsOaVKDIQYwq3EDQ-pST2kRwNH_l1nCgW-WcFpNXiJYIBSbummp-KO3qZeqmvZ_U_uirCDL2RNj3E5y4_KzefIr',
+      clientDataJSON:
+        'eyJjaGFsbGVuZ2UiOiJkRzkwWVd4c2VWVnVhWEYxWlZaaGJIVmxSWFpsY25sQmRIUmxjM1JoZEdsdmJnIiwiY2xpZW50RXh0ZW5zaW9ucyI6e30sImhhc2hBbGdvcml0aG0iOiJTSEEtMjU2Iiwib3JpZ2luIjoiaHR0cHM6Ly9kZXYuZG9udG5lZWRhLnB3IiwidHlwZSI6IndlYmF1dGhuLmNyZWF0ZSJ9',
+    },
+    clientExtensionResults: {},
+    type: 'public-key',
+  };
+  const attestationOrigin = 'https://dev.dontneeda.pw';
+  const attestationRpId = 'dev.dontneeda.pw';
+  const attestationChallenge = 'dG90YWxseVVuaXF1ZVZhbHVlRXZlcnlBdHRlc3RhdGlvbg';
+
+  const clientAssertion = {
+    id: 'wSisR0_4hlzw3Y1tj4uNwwifIhRa-ZxWJwWbnfror0pVK9qPdBPO5pW3gasPqn6wXHb0LNhXB_IrA1nFoSQJ9A',
+    rawId: 'wSisR0_4hlzw3Y1tj4uNwwifIhRa-ZxWJwWbnfror0pVK9qPdBPO5pW3gasPqn6wXHb0LNhXB_IrA1nFoSQJ9A',
+    response: {
+      authenticatorData: 'PdxHEOnAiLIp26idVjIguzn3Ipr_RlsKZWsa-5qK-KABAAAAAA',
+      clientDataJSON:
+        'eyJjaGFsbGVuZ2UiOiJkRzkwWVd4c2VWVnVhWEYxWlZaaGJIVmxSWFpsY25sQmMzTmxjblJwYjI0IiwiY2xpZW50RXh0ZW5zaW9ucyI6e30sImhhc2hBbGdvcml0aG0iOiJTSEEtMjU2Iiwib3JpZ2luIjoiaHR0cHM6Ly9kZXYuZG9udG5lZWRhLnB3IiwidHlwZSI6IndlYmF1dGhuLmdldCJ9',
+      signature:
+        'MEQCIBu6M-DGzu1O8iocGHEj0UaAZm0HmxTeRIE6-nS3_CPjAiBDsmIzy5sacYwwzgpXqfwRt_2vl5yiQZ_OAqWJQBGVsQ',
+    },
+    type: 'public-key',
+  };
+
+  const assertionChallenge = 'dG90YWxseVVuaXF1ZVZhbHVlRXZlcnlBc3NlcnRpb24';
+  const assertionOrigin = 'https://dev.dontneeda.pw';
+  const assertionRpId = 'dev.dontneeda.pw';
+  const assertionCredential = {
+    publicKey:
+      'pQECAyYgASFYIGmaxR4mBbukc2QhtW2ldhAAd555r-ljlGQN8MbcTnPPIlgg9CyUlE-0AB2fbzZbNgBvJuRa7r6o2jPphOmtyNPR_kY',
+    id: 'wSisR0_4hlzw3Y1tj4uNwwifIhRa-ZxWJwWbnfror0pVK9qPdBPO5pW3gasPqn6wXHb0LNhXB_IrA1nFoSQJ9A',
+    counter: 0,
+  };
+
+  // Generated from masterKey
+  const jwtSecret = '7ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff';
+
+  const callChallenge = async sessionToken => {
+    const res = await request({
+      headers: {
+        ...headers,
+        'X-Parse-Session-Token': sessionToken,
+      },
+      method: 'POST',
+      url: 'http://localhost:8378/1/challenge',
+      body: JSON.stringify({
+        challengeData: {
+          webauthn: true,
+        },
+      }),
+    });
+    const {
+      challengeData: {
+        webauthn: { signedChallenge, options },
+      },
+    } = JSON.parse(res.text);
+    return { signedChallenge, options };
+  };
+  it('should throw if user not logged and try to register', async () => {
+    await reconfigureServer({
+      auth: { webauthn: true },
+    });
+
+    const user = new Parse.User();
+    try {
+      await user.save({ authData: { webauthn: { id: 'webauthn' } } });
+    } catch (e) {
+      expect(e.message).toContain('Webauthn can only be configured on an already logged in user.');
+    }
+  });
+  it('should register if user logged', async () => {
+    await reconfigureServer({
+      auth: { webauthn: true },
+    });
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password' });
+
+    const { signedChallenge, options } = await callChallenge(user.getSessionToken());
+
+    expect(typeof signedChallenge).toEqual('string');
+    const { challenge, ...otherOptions } = options;
+    delete otherOptions.authenticatorSelection.residentKey;
+    expect(typeof challenge).toEqual('string');
+    expect(otherOptions).toEqual({
+      rp: { name: 'Localhost', id: 'localhost' },
+      user: { id: user.id, name: 'username', displayName: 'username' },
+      pubKeyCredParams: [
+        { alg: -7, type: 'public-key' },
+        { alg: -8, type: 'public-key' },
+        { alg: -36, type: 'public-key' },
+        { alg: -37, type: 'public-key' },
+        { alg: -38, type: 'public-key' },
+        { alg: -39, type: 'public-key' },
+        { alg: -257, type: 'public-key' },
+        { alg: -258, type: 'public-key' },
+        { alg: -259, type: 'public-key' },
+      ],
+      timeout: 60000,
+      attestation: 'indirect',
+      excludeCredentials: [],
+      authenticatorSelection: { userVerification: 'required', requireResidentKey: false },
+    });
+
+    await reconfigureServer({
+      auth: { webauthn: { options: { rpId: attestationRpId, origin: attestationOrigin } } },
+    });
+
+    try {
+      await user.save(
+        {
+          authData: {
+            webauthn: { attestation: clientAttestation, signedChallenge: 'test' },
+          },
+        },
+        { sessionToken: user.getSessionToken() }
+      );
+    } catch (e) {
+      expect(e.message).toContain('Invalid signedChallenge');
+    }
+
+    try {
+      await user.save(
+        {
+          authData: {
+            webauthn: {
+              attestation: clientAttestation,
+              signedChallenge: sign({ challenge: 'test' }, jwtSecret),
+            },
+          },
+        },
+        { sessionToken: user.getSessionToken() }
+      );
+    } catch (e) {
+      expect(e.message).toContain('Invalid webauthn attestation');
+    }
+
+    await user.save(
+      {
+        authData: {
+          webauthn: {
+            attestation: clientAttestation,
+            signedChallenge: sign({ challenge: attestationChallenge }, jwtSecret),
+          },
+        },
+      },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    await user.fetch({ useMasterKey: true });
+    const webauthnAuthData = user.get('authData').webauthn;
+    expect(webauthnAuthData).toBeDefined();
+    expect(webauthnAuthData.id).toEqual(clientAttestation.id);
+    expect(webauthnAuthData.counter).toEqual(0);
+    expect(typeof webauthnAuthData.publicKey).toEqual('string');
+  });
+  it('should register with master key and already created user', async () => {
+    await reconfigureServer({
+      auth: { webauthn: true },
+    });
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password' });
+
+    await reconfigureServer({
+      auth: { webauthn: { options: { rpId: attestationRpId, origin: attestationOrigin } } },
+    });
+
+    await user.save(
+      {
+        authData: {
+          webauthn: {
+            attestation: clientAttestation,
+            signedChallenge: sign({ challenge: attestationChallenge }, jwtSecret),
+          },
+        },
+      },
+      { useMasterKey: true }
+    );
+
+    await user.fetch({ useMasterKey: true });
+    const webauthnAuthData = user.get('authData').webauthn;
+    expect(webauthnAuthData).toBeDefined();
+    expect(webauthnAuthData.id).toEqual(clientAttestation.id);
+    expect(webauthnAuthData.counter).toEqual(0);
+    expect(typeof webauthnAuthData.publicKey).toEqual('string');
+  });
+  it('should update registered credential', async () => {
+    const server = await reconfigureServer({
+      auth: { webauthn: { options: { rpId: attestationRpId, origin: attestationOrigin } } },
+    });
+
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password' });
+
+    await server.config.databaseController.update(
+      '_User',
+      { objectId: user.id },
+      { authData: { webauthn: { id: 'credId', publicKey: 'test', counter: 6 } } },
+      {}
+    );
+    const fakedSignedChallenge = sign({ challenge: attestationChallenge }, jwtSecret);
+
+    await user.save(
+      {
+        authData: {
+          webauthn: { attestation: clientAttestation, signedChallenge: fakedSignedChallenge },
+        },
+      },
+      { sessionToken: user.getSessionToken() }
+    );
+
+    await user.fetch({ useMasterKey: true });
+    const webauthnAuthData = user.get('authData').webauthn;
+    expect(webauthnAuthData).toBeDefined();
+    expect(webauthnAuthData.id).toEqual(clientAttestation.id);
+    expect(webauthnAuthData.counter).toEqual(0);
+    expect(typeof webauthnAuthData.publicKey).toEqual('string');
+  });
+  it('should login', async () => {
+    const server = await reconfigureServer({
+      auth: { webauthn: { options: { rpId: assertionRpId, origin: assertionOrigin } } },
+    });
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password' });
+    await server.config.databaseController.update(
+      '_User',
+      { objectId: user.id },
+      { authData: { webauthn: assertionCredential } },
+      {}
+    );
+
+    const { signedChallenge, options } = await callChallenge();
+    expect(typeof signedChallenge).toEqual('string');
+    expect(typeof options.challenge).toEqual('string');
+    expect(options.timeout).toEqual(60000);
+
+    const user2 = new Parse.User();
+
+    try {
+      await user2.save({
+        authData: {
+          webauthn: {
+            id: assertionCredential.id,
+            assertion: clientAssertion,
+            signedChallenge: sign({ challenge: 'test' }, jwtSecret),
+          },
+        },
+      });
+    } catch (e) {
+      expect(e.message).toContain('Invalid webauthn assertion');
+    }
+    await user2.save({
+      authData: {
+        webauthn: {
+          id: assertionCredential.id,
+          assertion: clientAssertion,
+          signedChallenge: sign({ challenge: assertionChallenge }, jwtSecret),
+        },
+      },
+    });
+
+    expect(user2.getSessionToken()).toBeDefined();
+    expect(user2.id).toEqual(user.id);
+    await user2.fetch({ useMasterKey: true });
+    const webauthnAuthData = user2.get('authData').webauthn;
+    expect(webauthnAuthData.publicKey).toEqual(assertionCredential.publicKey);
+    expect(webauthnAuthData.id).toEqual(assertionCredential.id);
+    expect(webauthnAuthData.counter).toEqual(assertionCredential.counter);
+  });
+  it('should handle options rpId, rpName, origin, getUsername, getUserDisplayName, attestationType, requireResidentKey', async () => {
+    await reconfigureServer({
+      auth: { webauthn: true },
+    });
+
+    const user = new Parse.User();
+    await user.save({ username: 'username', password: 'password', email: 'test@test.test' });
+
+    let options = (await callChallenge(user.getSessionToken())).options;
+
+    expect(options.rp).toEqual({ name: 'Localhost', id: 'localhost' });
+    expect(options.user).toEqual({ id: user.id, name: 'username', displayName: 'test@test.test' });
+
+    await reconfigureServer({
+      publicServerURL: 'https://subdomain.a-super-app.com/parse',
+      auth: {
+        webauthn: {
+          options: {
+            getUserDisplayName: user => {
+              return user.get('username').toUpperCase();
+            },
+          },
+        },
+      },
+    });
+
+    options = (await callChallenge(user.getSessionToken())).options;
+
+    expect(options.rp).toEqual({ name: 'A Super App', id: 'a-super-app.com' });
+    expect(options.user).toEqual({ id: user.id, name: 'username', displayName: 'USERNAME' });
+
+    await reconfigureServer({
+      publicServerURL: 'https://subdomain.a-super-app.com/parse',
+      auth: {
+        webauthn: {
+          options: {
+            rpId: 'my.app.com',
+            rpName: 'App',
+            origin: 'app.com',
+            attestationType: 'direct',
+            residentKey: 'required',
+            getUserDisplayName: user => user.get('username').toUpperCase(),
+            getUsername: user => user.get('username') + user.id,
+          },
+        },
+      },
+    });
+
+    options = (await callChallenge(user.getSessionToken())).options;
+    expect(options.rp).toEqual({ name: 'App', id: 'my.app.com' });
+    expect(options.authenticatorSelection.requireResidentKey).toBeTruthy();
+    expect(options.attestation).toEqual('direct');
+    expect(options.user).toEqual({
+      id: user.id,
+      name: 'username' + user.id,
+      displayName: 'USERNAME',
+    });
   });
 });

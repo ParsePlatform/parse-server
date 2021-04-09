@@ -58,7 +58,7 @@ const getObject = async (
       options.keys = keys;
     }
   } catch (e) {
-    console.log(e);
+    console.error(e);
   }
   if (include) {
     options.include = include;

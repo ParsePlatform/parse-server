@@ -1,5 +1,13 @@
-const RestQuery = require('./RestQuery');
 const Parse = require('parse/node');
+import _ from 'lodash';
+
+const reducePromise = async (arr, fn, acc, index = 0) => {
+  if (arr[index]) {
+    const newAcc = await Promise.resolve(fn(acc, arr[index]));
+    return reducePromise(arr, fn, newAcc, index + 1);
+  }
+  return acc;
+};
 
 // An Auth object tells you who is requesting something and whether
 // the master key was used.
@@ -83,7 +91,8 @@ const getAuthForSessionToken = async function ({
       limit: 1,
       include: 'user',
     };
-
+    // For cyclic dep
+    const RestQuery = require('./RestQuery');
     const query = new RestQuery(config, master(config), '_Session', { sessionToken }, restOptions);
     results = (await query.execute()).results;
   } else {
@@ -125,6 +134,8 @@ var getAuthForLegacySessionToken = function ({ config, sessionToken, installatio
   var restOptions = {
     limit: 1,
   };
+  // For cyclic dep
+  const RestQuery = require('./RestQuery');
   var query = new RestQuery(config, master(config), '_User', { sessionToken }, restOptions);
   return query.execute().then(response => {
     var results = response.results;
@@ -169,6 +180,8 @@ Auth.prototype.getRolesForUser = async function () {
         objectId: this.user.id,
       },
     };
+    // For cyclic dep
+    const RestQuery = require('./RestQuery');
     await new RestQuery(this.config, master(this.config), '_Role', restWhere, {}).each(result =>
       results.push(result)
     );
@@ -253,6 +266,8 @@ Auth.prototype.getRolesByIds = async function (ins) {
       };
     });
     const restWhere = { roles: { $in: roles } };
+    // For cyclic dep
+    const RestQuery = require('./RestQuery');
     await new RestQuery(this.config, master(this.config), '_Role', restWhere, {}).each(result =>
       results.push(result)
     );
@@ -298,6 +313,149 @@ Auth.prototype._getAllRolesNamesForRoleIds = function (roleIDs, names = [], quer
     });
 };
 
+const findUsersWithAuthData = (config, authData) => {
+  const providers = Object.keys(authData);
+  const query = providers
+    .reduce((memo, provider) => {
+      if (!authData[provider] || (authData && !authData[provider].id)) {
+        return memo;
+      }
+      const queryKey = `authData.${provider}.id`;
+      const query = {};
+      query[queryKey] = authData[provider].id;
+      memo.push(query);
+      return memo;
+    }, [])
+    .filter(q => {
+      return typeof q !== 'undefined';
+    });
+
+  let findPromise = Promise.resolve([]);
+  if (query.length > 0) {
+    findPromise = config.database.find('_User', { $or: query }, {});
+  }
+
+  return findPromise;
+};
+
+const hasMutatedAuthData = (authData, userAuthData) => {
+  if (!userAuthData) return { hasMutatedAuthData: true, mutatedAuthData: authData };
+  const mutatedAuthData = {};
+  Object.keys(authData).forEach(provider => {
+    // Anonymous provider is not handled this way
+    if (provider === 'anonymous') return;
+    const providerData = authData[provider];
+    const userProviderAuthData = userAuthData[provider];
+    if (!_.isEqual(providerData, userProviderAuthData)) {
+      mutatedAuthData[provider] = providerData;
+    }
+  });
+  const hasMutatedAuthData = Object.keys(mutatedAuthData).length !== 0;
+  return { hasMutatedAuthData, mutatedAuthData };
+};
+
+const checkIfUserHasProvidedConfiguredProvidersForLogin = (
+  authData = {},
+  userAuthData = {},
+  config
+) => {
+  const savedUserProviders = Object.keys(userAuthData).map(provider => ({
+    name: provider,
+    adapter: config.authDataManager.getValidatorForProvider(provider).adapter,
+  }));
+
+  const hasProvidedASoloProvider = savedUserProviders.some(
+    provider =>
+      provider && provider.adapter && provider.adapter.policy === 'solo' && authData[provider.name]
+  );
+
+  // Solo providers can be considered as safe
+  // so we do not have to check if the user need
+  // to provide an additional provider to login
+  if (hasProvidedASoloProvider) return;
+
+  const additionProvidersNotFound = [];
+  const hasProvidedAtLeastOneAdditionalProvider = savedUserProviders.some(provider => {
+    if (provider && provider.adapter && provider.adapter.policy === 'additional') {
+      if (authData[provider.name]) {
+        return true;
+      } else {
+        // Push missing provider for plausible error return
+        additionProvidersNotFound.push(provider.name);
+      }
+    }
+  });
+  if (hasProvidedAtLeastOneAdditionalProvider || !additionProvidersNotFound.length) return;
+
+  throw new Parse.Error(
+    Parse.Error.OTHER_CAUSE,
+    `Missing additional authData ${additionProvidersNotFound.join(',')}`
+  );
+};
+
+// Validate each authData step by step and return the provider responses
+const handleAuthDataValidation = async (authData, req, foundUser) => {
+  let user;
+  if (foundUser) {
+    user = Parse.User.fromJSON({ className: '_User', ...foundUser });
+    // Find the user by session and current object id
+    // Only pass user if it's the current one or master key with provided user
+  } else if (
+    (req.auth &&
+      req.auth.user &&
+      typeof req.getUserId === 'function' &&
+      req.getUserId() === req.auth.user.id) ||
+    (req.auth && req.auth.isMaster && typeof req.getUserId === 'function' && req.getUserId())
+  ) {
+    user = new Parse.User();
+    user.id = req.auth.isMaster ? req.getUserId() : req.auth.user.id;
+    await user.fetch({ useMasterKey: true });
+  }
+
+  // Perform validation as step by step pipeline
+  // for better error consistency and also to avoid to trigger a provider (like OTP SMS)
+  // if another one fail
+  return reducePromise(
+    // apply sort to run the pipeline each time in the same order
+
+    Object.keys(authData).sort(),
+    async (acc, provider) => {
+      if (authData[provider] === null) {
+        acc.authData[provider] = null;
+        return acc;
+      }
+      const { validator } = req.config.authDataManager.getValidatorForProvider(provider);
+      if (!validator) {
+        throw new Parse.Error(
+          Parse.Error.UNSUPPORTED_SERVICE,
+          'This authentication method is unsupported.'
+        );
+      }
+      const validationResult = await validator(
+        authData[provider],
+        { config: req.config, auth: req.auth },
+        user
+      );
+      if (validationResult) {
+        if (!Object.keys(validationResult).length) acc.authData[provider] = authData[provider];
+
+        if (validationResult.response) acc.authDataResponse[provider] = validationResult.response;
+        // Some auth providers after initialization will avoid
+        // to replace authData already stored
+        if (!validationResult.doNotSave) {
+          acc.authData[provider] = validationResult.save || authData[provider];
+        }
+      } else {
+        // Support current authData behavior
+        // no result store the new AuthData
+        acc.authData[provider] = authData[provider];
+      }
+      return acc;
+    },
+    { authData: {}, authDataResponse: {} }
+  );
+};
+
 module.exports = {
   Auth,
   master,
@@ -305,4 +463,9 @@ module.exports = {
   readOnly,
   getAuthForSessionToken,
   getAuthForLegacySessionToken,
+  findUsersWithAuthData,
+  hasMutatedAuthData,
+  checkIfUserHasProvidedConfiguredProvidersForLogin,
+  reducePromise,
+  handleAuthDataValidation,
 };
