@@ -472,6 +472,11 @@ export class MongoStorageAdapter implements StorageAdapter {
             }
           }
           throw err;
+        } else if (error.code === 16755 || error.code === 16756) {
+          // Can't extract geo keys
+          const err = new Parse.Error(Parse.Error.INVALID_VALUE, error.message);
+          err.underlyingError = error;
+          throw err;
         }
         throw error;
       })

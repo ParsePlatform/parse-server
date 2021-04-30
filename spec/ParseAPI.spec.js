@@ -35,6 +35,36 @@ describe_only_db('mongo')('miscellaneous', () => {
   });
 });
 
+describe_only_db('mongo')('spatial index', () => {
+  beforeAll(async () => {
+    await TestUtils.destroyAllDataPermanently(false);
+    // Create a schema with a spatial index
+    const testSchema = new Parse.Schema('geojson_test');
+    testSchema.addObject('geometry');
+    testSchema.addIndex('geospatial_index', {
+      geometry: '2dsphere',
+    });
+    await testSchema.save();
+  });
+
+  it('invalid geometry fails (#7331)', async () => {
+    const obj = new Parse.Object('geojson_test');
+    obj.set('geometry', { foo: 'bar' });
+    try {
+      await obj.save();
+      fail('Invalid geometry did not fail');
+    } catch (e) {
+      expect(e.code).toEqual(Parse.Error.INVALID_VALUE);
+    }
+  });
+
+  it('valid geometry succeeds', async () => {
+    const obj = new Parse.Object('geojson_test');
+    obj.set('geometry', { type: 'Point', coordinates: [-73.97, 40.77] });
+    await obj.save();
+  });
+});
+
 describe('miscellaneous', function () {
   it('create a GameScore object', function (done) {
     const obj = new Parse.Object('GameScore');
