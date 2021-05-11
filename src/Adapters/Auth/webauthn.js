@@ -88,7 +88,7 @@ const registerOptions = (user, options = {}, config) => {
     attestationType: options.attestationType || 'indirect',
     authenticatorSelection: {
       // Use required to avoid silent sign up
-      userVerification: 'required',
+      userVerification: options.userVerification || 'required',
       residentKey: options.residentKey || 'preferred',
     },
   });
