@@ -1,5 +1,5 @@
 import Parse from 'parse/node';
-import { ApolloError } from 'apollo-server-core';
+import { EnvelopError } from '@envelop/core';
 
 export function enforceMasterKeyAccess(auth) {
   if (!auth.isMaster) {
@@ -16,7 +16,9 @@ export function toGraphQLError(error) {
     code = Parse.Error.INTERNAL_SERVER_ERROR;
     message = 'Internal server error';
   }
-  return new ApolloError(message, code);
+  return new EnvelopError(message, {
+    code,
+  });
 }
 
 export const extractKeysAndInclude = selectedFields => {

@@ -120,6 +120,33 @@ describe('ParseGraphQLServer', () => {
     });
   });
 
+  describe('_getGraphQLSchema', () => {
+    it('should load GraphQL schema in every call', async () => {
+      const originalLoad = parseGraphQLServer.parseGraphQLSchema.load;
+      let counter = 0;
+      parseGraphQLServer.parseGraphQLSchema.load = () => ++counter;
+      expect(await parseGraphQLServer._getGraphQLSchema()).toEqual(1);
+      expect(await parseGraphQLServer._getGraphQLSchema()).toEqual(2);
+      expect(await parseGraphQLServer._getGraphQLSchema()).toEqual(3);
+      parseGraphQLServer.parseGraphQLSchema.load = originalLoad;
+    });
+  });
+
+  describe('_getEnveloped', () => {
+    const request = {
+      info: new Object(),
+      config: new Object(),
+      auth: new Object(),
+    };
+    it("should return object with contextFactory function that creates context with req's info, config and auth", async () => {
+      const { contextFactory } = await parseGraphQLServer._getEnveloped();
+      const context = await contextFactory({ request });
+      expect(context.info).toEqual(request.info);
+      expect(context.config).toEqual(request.config);
+      expect(context.auth).toEqual(request.auth);
+    });
+  });
+
   describe('_transformMaxUploadSizeToBytes', () => {
     it('should transform to bytes', () => {
       expect(parseGraphQLServer._transformMaxUploadSizeToBytes('20mb')).toBe(20971520);
@@ -501,13 +528,18 @@ describe('ParseGraphQLServer', () => {
 
       it('should handle Parse headers', async () => {
         let checked = false;
-        const originalGetGraphQLOptions = parseGraphQLServer._getGraphQLOptions;
-        parseGraphQLServer._getGraphQLOptions = async req => {
-          expect(req.info).toBeDefined();
-          expect(req.config).toBeDefined();
-          expect(req.auth).toBeDefined();
+        const originalGetEnveloped = parseGraphQLServer._getEnveloped.bind(parseGraphQLServer);
+        parseGraphQLServer._getEnveloped = async () => {
+          const enveloped = await originalGetEnveloped();
+          const originalContextFactory = enveloped.contextFactory;
+          enveloped.contextFactory = async opts => {
+            expect(opts.request.info).toBeDefined();
+            expect(req.request.config).toBeDefined();
+            expect(req.request.auth).toBeDefined();
+            return originalContextFactory(opts);
+          };
           checked = true;
-          return await originalGetGraphQLOptions.bind(parseGraphQLServer)(req);
+          return enveloped;
         };
         const health = (
           await apolloClient.query({
@@ -520,7 +552,7 @@ describe('ParseGraphQLServer', () => {
         ).data.health;
         expect(health).toBeTruthy();
         expect(checked).toBeTruthy();
-        parseGraphQLServer._getGraphQLOptions = originalGetGraphQLOptions;
+        parseGraphQLServer._getEnveloped = originalGetEnveloped;
       });
     });
 
