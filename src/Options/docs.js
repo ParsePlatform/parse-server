@@ -28,6 +28,7 @@
  * @property {Boolean} enableAnonymousUsers Enable (or disable) anonymous users, defaults to true
  * @property {Boolean} enableExpressErrorHandler Enables the default express error handler for all errors
  * @property {String} encryptionKey Key for encrypting your files
+ * @property {Boolean} enforcePrivateUsers Set to true if new users should be created without public read and write access.
  * @property {Boolean} expireInactiveSessions Sets wether we should expire the inactive sessions, defaults to true
  * @property {String} fileKey Key for your files
  * @property {Adapter<FilesAdapter>} filesAdapter Adapter module for the files sub-system

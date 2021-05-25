@@ -2,11 +2,11 @@
  * The deprecations.
  *
  * Add deprecations to the array using the following keys:
- * - `optionKey`: The option key incl. its path, e.g. `security.enableCheck`.
- * - `envKey`: The environment key, e.g. `PARSE_SERVER_SECURITY`.
- * - `changeNewKey`: Set the new key name if the current key will be replaced,
+ * - `optionKey` {String}: The option key incl. its path, e.g. `security.enableCheck`.
+ * - `envKey` {String}: The environment key, e.g. `PARSE_SERVER_SECURITY`.
+ * - `changeNewKey` {String}: Set the new key name if the current key will be replaced,
  * or set to an empty string if the current key will be removed without replacement.
- * - `changeNewDefault`: Set the new default value if the key's default value
+ * - `changeNewDefault` {String}: Set the new default value if the key's default value
  * will change in a future version.
  * - `solution`: The instruction to resolve this deprecation warning. Optional. This
  * instruction must not include the deprecation warning which is auto-generated.
@@ -22,4 +22,5 @@ module.exports = [
     solution:
       "Additionally, the environment variable 'PARSE_SERVER_ENABLE_EXPERIMENTAL_DIRECT_ACCESS' will be deprecated and renamed to 'PARSE_SERVER_DIRECT_ACCESS' in a future version; it is currently possible to use either one.",
   },
+  { optionKey: 'enforcePrivateUsers', changeNewDefault: 'true' },
 ];

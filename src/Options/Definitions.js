@@ -154,6 +154,12 @@ module.exports.ParseServerOptions = {
     env: 'PARSE_SERVER_ENCRYPTION_KEY',
     help: 'Key for encrypting your files',
   },
+  enforcePrivateUsers: {
+    env: 'PARSE_SERVER_ENFORCE_PRIVATE_USERS',
+    help: 'Set to true if new users should be created without public read and write access.',
+    action: parsers.booleanParser,
+    default: false,
+  },
   expireInactiveSessions: {
     env: 'PARSE_SERVER_EXPIRE_INACTIVE_SESSIONS',
     help: 'Sets wether we should expire the inactive sessions, defaults to true',

@@ -13,20 +13,6 @@ const passwordCrypto = require('../lib/password');
 const Config = require('../lib/Config');
 const cryptoUtils = require('../lib/cryptoUtils');
 
-function verifyACL(user) {
-  const ACL = user.getACL();
-  expect(ACL.getReadAccess(user)).toBe(true);
-  expect(ACL.getWriteAccess(user)).toBe(true);
-  expect(ACL.getPublicReadAccess()).toBe(true);
-  expect(ACL.getPublicWriteAccess()).toBe(false);
-  const perms = ACL.permissionsById;
-  expect(Object.keys(perms).length).toBe(2);
-  expect(perms[user.id].read).toBe(true);
-  expect(perms[user.id].write).toBe(true);
-  expect(perms['*'].read).toBe(true);
-  expect(perms['*'].write).not.toBe(true);
-}
-
 describe('Parse.User testing', () => {
   it('user sign up class method', async done => {
     const user = await Parse.User.signUp('asdf', 'zxcv');
@@ -146,7 +132,17 @@ describe('Parse.User testing', () => {
     await Parse.User.signUp('asdf', 'zxcv');
     const user = await Parse.User.logIn('asdf', 'zxcv');
     equal(user.get('username'), 'asdf');
-    verifyACL(user);
+    const ACL = user.getACL();
+    expect(ACL.getReadAccess(user)).toBe(true);
+    expect(ACL.getWriteAccess(user)).toBe(true);
+    expect(ACL.getPublicReadAccess()).toBe(true);
+    expect(ACL.getPublicWriteAccess()).toBe(false);
+    const perms = ACL.permissionsById;
+    expect(Object.keys(perms).length).toBe(2);
+    expect(perms[user.id].read).toBe(true);
+    expect(perms[user.id].write).toBe(true);
+    expect(perms['*'].read).toBe(true);
+    expect(perms['*'].write).not.toBe(true);
     done();
   });
 
@@ -3928,6 +3924,31 @@ describe('Parse.User testing', () => {
     } catch (e) {
       expect(e.code).toBe(Parse.Error.SESSION_MISSING);
     }
+  });
+
+  it('should throw when enforcePrivateUsers is invalid', async () => {
+    const options = [[], 'a', 0, {}];
+    for (const option of options) {
+      await expectAsync(reconfigureServer({ enforcePrivateUsers: option })).toBeRejected();
+    }
+  });
+
+  it('user login with enforcePrivateUsers', async done => {
+    await reconfigureServer({ enforcePrivateUsers: true });
+    await Parse.User.signUp('asdf', 'zxcv');
+    const user = await Parse.User.logIn('asdf', 'zxcv');
+    equal(user.get('username'), 'asdf');
+    const ACL = user.getACL();
+    expect(ACL.getReadAccess(user)).toBe(true);
+    expect(ACL.getWriteAccess(user)).toBe(true);
+    expect(ACL.getPublicReadAccess()).toBe(false);
+    expect(ACL.getPublicWriteAccess()).toBe(false);
+    const perms = ACL.permissionsById;
+    expect(Object.keys(perms).length).toBe(1);
+    expect(perms[user.id].read).toBe(true);
+    expect(perms[user.id].write).toBe(true);
+    expect(perms['*']).toBeUndefined();
+    done();
   });
 
   describe('issue #4897', () => {

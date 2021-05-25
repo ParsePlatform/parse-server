@@ -75,6 +75,7 @@ export class Config {
     fileUpload,
     pages,
     security,
+    enforcePrivateUsers,
   }) {
     if (masterKey === readOnlyMasterKey) {
       throw new Error('masterKey and readOnlyMasterKey should be different');
@@ -111,6 +112,13 @@ export class Config {
     this.validateIdempotencyOptions(idempotencyOptions);
     this.validatePagesOptions(pages);
     this.validateSecurityOptions(security);
+    this.validateEnforcePrivateUsers(enforcePrivateUsers);
+  }
+
+  static validateEnforcePrivateUsers(enforcePrivateUsers) {
+    if (typeof enforcePrivateUsers !== 'boolean') {
+      throw 'Parse Server option enforcePrivateUsers must be a boolean.';
+    }
   }
 
   static validateSecurityOptions(security) {
