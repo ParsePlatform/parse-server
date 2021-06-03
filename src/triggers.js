@@ -165,7 +165,11 @@ export function getTrigger(className, triggerType, applicationId) {
   if (!applicationId) {
     throw 'Missing ApplicationID';
   }
-  return get(Category.Triggers, `${triggerType}.${className}`, applicationId);
+  const trigger = get(Category.Triggers, `${triggerType}.${className}`, applicationId);
+  if (trigger) {
+    return trigger;
+  }
+  return get(Category.Triggers, `${triggerType}.*`, applicationId);
 }
 
 export async function runTrigger(trigger, name, request, auth) {
