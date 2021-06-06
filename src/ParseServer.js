@@ -95,12 +95,12 @@ class ParseServer {
           await new DefinedSchemas(schemas, this.config).execute();
         }
         if (serverStartComplete) {
-          serverStartComplete();
+          await serverStartComplete();
         }
       })
-      .catch(error => {
+      .catch(async error => {
         if (serverStartComplete) {
-          serverStartComplete(error);
+          await serverStartComplete(error);
         } else {
           console.error(error);
           process.exit(1);

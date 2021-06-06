@@ -9,6 +9,7 @@ import { useExternal } from './deprecated';
 import { getLogger } from './logger';
 import { PushWorker } from './Push/PushWorker';
 import { ParseServerOptions } from './Options';
+import * as Migrations  from './Migrations';
 import { ParseGraphQLServer } from './GraphQL/ParseGraphQLServer';
 
 // Factory function
@@ -40,4 +41,5 @@ export {
   PushWorker,
   ParseGraphQLServer,
   _ParseServer as ParseServer,
+  Migrations,
 };
