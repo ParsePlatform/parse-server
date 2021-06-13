@@ -52,6 +52,11 @@ module.exports.ParseServerOptions = {
       'Configuration for your authentication providers, as stringified JSON. See http://docs.parseplatform.org/parse-server/guide/#oauth-and-3rd-party-authentication',
     action: parsers.objectParser,
   },
+  beforeSchemasMigration: {
+    env: 'PARSE_SERVER_BEFORE_SCHEMAS_MIGRATION',
+    help:
+      'Callback when server has started and before running schemas migration operations if schemas key provided',
+  },
   cacheAdapter: {
     env: 'PARSE_SERVER_CACHE_ADAPTER',
     help: 'Adapter module for the cache',
@@ -360,6 +365,12 @@ module.exports.ParseServerOptions = {
     action: parsers.booleanParser,
     default: false,
   },
+  schemas: {
+    env: 'PARSE_SERVER_SCHEMAS',
+    help:
+      'Rest representation on Parse.Schema https://docs.parseplatform.org/rest/guide/#adding-a-schema',
+    action: parsers.arrayParser,
+  },
   security: {
     env: 'PARSE_SERVER_SECURITY',
     help: 'The security options to identify and report weak security settings.',
@@ -553,6 +564,8 @@ module.exports.PagesCustomUrlsOptions = {
     help: 'The URL to the custom page for password reset -> success.',
   },
 };
+module.exports.FieldType = {};
+module.exports.JSONSchema = {};
 module.exports.CustomPagesOptions = {
   choosePassword: {
     env: 'PARSE_SERVER_CUSTOM_PAGES_CHOOSE_PASSWORD',

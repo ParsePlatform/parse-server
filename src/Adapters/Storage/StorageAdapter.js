@@ -35,6 +35,7 @@ export interface StorageAdapter {
   setClassLevelPermissions(className: string, clps: any): Promise<void>;
   createClass(className: string, schema: SchemaType): Promise<void>;
   addFieldIfNotExists(className: string, fieldName: string, type: any): Promise<void>;
+  updateFieldOptions(className: string, fieldName: string, type: any): Promise<void>;
   deleteClass(className: string): Promise<void>;
   deleteAllClasses(fast: boolean): Promise<void>;
   deleteFields(className: string, schema: SchemaType, fieldNames: Array<string>): Promise<void>;

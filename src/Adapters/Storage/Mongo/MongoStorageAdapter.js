@@ -345,6 +345,11 @@ export class MongoStorageAdapter implements StorageAdapter {
       .catch(err => this.handleError(err));
   }
 
+  async updateFieldOptions(className: string, fieldName: string, type: any) {
+    const schemaCollection = await this._schemaCollection();
+    await schemaCollection.updateFieldOptions(className, fieldName, type);
+  }
+
   addFieldIfNotExists(className: string, fieldName: string, type: any): Promise<void> {
     return this._schemaCollection()
       .then(schemaCollection => schemaCollection.addFieldIfNotExists(className, fieldName, type))

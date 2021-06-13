@@ -212,7 +212,7 @@ class MongoSchemaCollection {
       .then(
         schema => {
           // If a field with this name already exists, it will be handled elsewhere.
-          if (schema.fields[fieldName] != undefined) {
+          if (schema.fields[fieldName] !== undefined) {
             return;
           }
           // The schema exists. Check for existing GeoPoints.
@@ -273,6 +273,20 @@ class MongoSchemaCollection {
           );
         }
       });
+  }
+
+  async updateFieldOptions(className: string, fieldName: string, fieldType: string) {
+    // eslint-disable-next-line no-unused-vars
+    const { type, targetClass, ...fieldOptions } = fieldType;
+    await this.upsertSchema(
+      className,
+      { [fieldName]: { $exists: true } },
+      {
+        $set: {
+          [`_metadata.fields_options.${fieldName}`]: fieldOptions,
+        },
+      }
+    );
   }
 }
 
