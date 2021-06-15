@@ -316,7 +316,7 @@ function transformQueryKeyValue(className, key, value, schema, count = false) {
   }
 
   // Handle query constraints
-  const transformedConstraint = transformConstraint(value, field, count);
+  const transformedConstraint = transformConstraint(value, key, field, count);
   if (transformedConstraint !== CannotTransform) {
     if (transformedConstraint.$text) {
       return { key: '$text', value: transformedConstraint.$text };
@@ -766,12 +766,16 @@ function relativeTimeToDate(text, now = new Date()) {
 // If it is not a valid constraint but it could be a valid something
 // else, return CannotTransform.
 // inArray is whether this is an array field.
-function transformConstraint(constraint, field, count = false) {
-  const inArray = field && field.type && field.type === 'Array';
+function transformConstraint(constraint, restKey, field, count = false) {
   if (typeof constraint !== 'object' || !constraint) {
     return CannotTransform;
   }
-  const transformFunction = inArray ? transformInteriorAtom : transformTopLevelAtom;
+
+  // transformer
+  const inArray = field && field.type && field.type === 'Array';
+  const inSubDocument = restKey.includes('.');
+  const transformFunction =
+    inArray || inSubDocument ? transformInteriorAtom : transformTopLevelAtom;
   const transformer = atom => {
     const result = transformFunction(atom, field);
     if (result === CannotTransform) {
@@ -779,6 +783,7 @@ function transformConstraint(constraint, field, count = false) {
     }
     return result;
   };
+
   // keys is the constraints in reverse alphabetical order.
   // This is a hack so that:
   //   $regex is handled before $options

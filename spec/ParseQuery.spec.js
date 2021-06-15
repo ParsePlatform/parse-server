@@ -4318,6 +4318,40 @@ describe('Parse.Query testing', () => {
     }
   });
 
+  it_only_db('mongo')('deeply nested Pointers (issue #7413)', async function (done) {
+    const parent = new Parse.Object('Parent');
+    const child1 = new Parse.Object('Child');
+    const child2 = new Parse.Object('Child');
+
+    parent.set('subDocument', { child: child1 });
+    parent.set('children', [
+      { child: child1, count: 2 },
+      { child: child2, count: 3 },
+    ]);
+    await parent.save();
+
+    // equalTo
+    const resultsEq = await new Parse.Query('Parent').equalTo('children.child', child1).find();
+    expect(resultsEq.length).toBe(1);
+
+    // direct subDocument equalTo
+    const resultsSubDocument = await new Parse.Query('Parent')
+      .equalTo('subDocument.child', child1)
+      .find();
+    expect(resultsSubDocument.length).toBe(1);
+
+    // subDocument in
+    const resultsSubDocumentIn = await new Parse.Query('Parent')
+      .containedIn('subDocument.child', [child1])
+      .find();
+    expect(resultsSubDocumentIn.length).toBe(1);
+
+    // containedIn
+    const results = await new Parse.Query('Parent').containedIn('children.child', [child1]).find();
+    expect(results.length).toBe(1);
+    done();
+  });
+
   it('include with *', async () => {
     const child1 = new TestObject({ foo: 'bar', name: 'ac' });
     const child2 = new TestObject({ foo: 'baz', name: 'flo' });
