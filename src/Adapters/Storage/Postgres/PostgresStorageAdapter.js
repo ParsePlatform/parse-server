@@ -1119,6 +1119,16 @@ export class PostgresStorageAdapter implements StorageAdapter {
     this._notifySchemaChange();
   }
 
+  async updateFieldOptions(className: string, fieldName: string, type: any) {
+    await this._client.tx('update-schema-field-options', async t => {
+      const path = `{fields,${fieldName}}`;
+      await t.none(
+        'UPDATE "_SCHEMA" SET "schema"=jsonb_set("schema", $<path>, $<type>)  WHERE "className"=$<className>',
+        { path, type, className }
+      );
+    });
+  }
+
   // Drops a collection. Resolves with true if it was a Parse Schema (eg. _User, Custom, etc.)
   // and resolves with false if it wasn't (eg. a join table). Rejects if deletion was impossible.
   async deleteClass(className: string) {

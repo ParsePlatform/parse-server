@@ -23,6 +23,7 @@
     "@graphql-tools/links": "6.2.5",
     "@graphql-tools/stitch": "6.2.4",
     "@graphql-tools/utils": "6.2.4",
+    "@node-rs/bcrypt": "1.1.0",
     "@parse/fs-files-adapter": "1.2.0",
     "@parse/push-adapter": "3.4.0",
     "apollo-server-express": "2.24.1",
@@ -151,8 +152,7 @@
   },
   "lint-staged": {
     "{src,spec}/{**/*,*}.js": [
-      "prettier --write",
-      "eslint --fix --cache",
+      "npm run prettier",
       "git add"
     ]
   }

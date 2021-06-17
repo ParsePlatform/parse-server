@@ -20,7 +20,7 @@ export function createClient(uri, databaseOptions) {
 
   if (process.env.PARSE_SERVER_LOG_LEVEL === 'debug') {
     const monitor = require('pg-monitor');
-    if(monitor.isAttached()) {
+    if (monitor.isAttached()) {
       monitor.detach();
     }
     monitor.attach(initOptions);

@@ -4,10 +4,12 @@ import CheckRunner from '../Security/CheckRunner';
 
 export class SecurityRouter extends PromiseRouter {
   mountRoutes() {
-    this.route('GET', '/security',
+    this.route(
+      'GET',
+      '/security',
       middleware.promiseEnforceMasterKeyAccess,
       this._enforceSecurityCheckEnabled,
-      async (req) => {
+      async req => {
         const report = await new CheckRunner(req.config.security).run();
         return {
           status: 200,

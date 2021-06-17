@@ -44,6 +44,7 @@ import { ParseGraphQLServer } from './GraphQL/ParseGraphQLServer';
 import { SecurityRouter } from './Routers/SecurityRouter';
 import CheckRunner from './Security/CheckRunner';
 import Deprecator from './Deprecator/Deprecator';
+import { DefinedSchemas } from './DefinedSchemas';
 
 // Mutate the Parse object to add the Cloud Code handlers
 addParseCloud();
@@ -68,6 +69,8 @@ class ParseServer {
       javascriptKey,
       serverURL = requiredParameter('You must provide a serverURL!'),
       serverStartComplete,
+      beforeSchemasMigration,
+      schemas,
     } = options;
     // Initialize the node client SDK automatically
     Parse.initialize(appId, javascriptKey || 'unused', masterKey);
@@ -84,7 +87,13 @@ class ParseServer {
     databaseController
       .performInitialization()
       .then(() => hooksController.load())
-      .then(() => {
+      .then(async () => {
+        if (beforeSchemasMigration) {
+          await Promise.resolve(beforeSchemasMigration());
+        }
+        if (schemas) {
+          await new DefinedSchemas(schemas, this.config).execute();
+        }
         if (serverStartComplete) {
           serverStartComplete();
         }

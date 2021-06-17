@@ -9,6 +9,7 @@
  * @property {String} appId Your Parse Application ID
  * @property {String} appName Sets the app name
  * @property {Any} auth Configuration for your authentication providers, as stringified JSON. See http://docs.parseplatform.org/parse-server/guide/#oauth-and-3rd-party-authentication
+ * @property {Function} beforeSchemasMigration Callback when server has started and before running schemas migration operations if schemas key provided
  * @property {Adapter<CacheAdapter>} cacheAdapter Adapter module for the cache
  * @property {Number} cacheMaxSize Sets the maximum size for the in memory cache, defaults to 10000
  * @property {Number} cacheTTL Sets the TTL for the in memory cache (in ms), defaults to 5000 (5 seconds)
@@ -66,6 +67,7 @@
  * @property {String} restAPIKey Key for REST calls
  * @property {Boolean} revokeSessionOnPasswordReset When a user changes their password, either through the reset password email or while logged in, all sessions are revoked if this is true. Set to false if you don't want to revoke sessions.
  * @property {Boolean} scheduledPush Configuration for push scheduling, defaults to false.
+ * @property {JSONSchema[]} schemas Rest representation on Parse.Schema https://docs.parseplatform.org/rest/guide/#adding-a-schema
  * @property {SecurityOptions} security The security options to identify and report weak security settings.
  * @property {Function} serverCloseComplete Callback when server has closed
  * @property {Function} serverStartComplete Callback when server has started
@@ -117,6 +119,14 @@
  * @property {String} passwordReset The URL to the custom page for password reset.
  * @property {String} passwordResetLinkInvalid The URL to the custom page for password reset -> link invalid.
  * @property {String} passwordResetSuccess The URL to the custom page for password reset -> success.
+ */
+
+/**
+ * @interface FieldType
+ */
+
+/**
+ * @interface JSONSchema
  */
 
 /**

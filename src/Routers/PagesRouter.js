@@ -236,15 +236,15 @@ export class PagesRouter extends PromiseRouter {
 
         const query = result.success
           ? {
-            [pageParams.username]: username,
-          }
+              [pageParams.username]: username,
+            }
           : {
-            [pageParams.username]: username,
-            [pageParams.token]: token,
-            [pageParams.appId]: config.applicationId,
-            [pageParams.error]: result.err,
-            [pageParams.appName]: config.appName,
-          };
+              [pageParams.username]: username,
+              [pageParams.token]: token,
+              [pageParams.appId]: config.applicationId,
+              [pageParams.error]: result.err,
+              [pageParams.appName]: config.appName,
+            };
         const page = result.success ? pages.passwordResetSuccess : pages.passwordReset;
 
         return this.goToPage(req, page, query, false);
@@ -273,8 +273,8 @@ export class PagesRouter extends PromiseRouter {
     const redirect = config.pages.forceRedirect
       ? true
       : responseType !== undefined
-        ? responseType
-        : req.method == 'POST';
+      ? responseType
+      : req.method == 'POST';
 
     // Include default parameters
     const defaultParams = this.getDefaultParams(config);
@@ -311,9 +311,9 @@ export class PagesRouter extends PromiseRouter {
       return Utils.getLocalizedPath(defaultPath, locale).then(({ path, subdir }) =>
         redirect
           ? this.redirectResponse(
-            this.composePageUrl(defaultFile, config.publicServerURL, subdir),
-            params
-          )
+              this.composePageUrl(defaultFile, config.publicServerURL, subdir),
+              params
+            )
           : this.pageResponse(path, params, placeholders)
       );
     } else {
@@ -452,8 +452,8 @@ export class PagesRouter extends PromiseRouter {
       typeof this.pagesConfig.placeholders === 'function'
         ? this.pagesConfig.placeholders(params)
         : Object.prototype.toString.call(this.pagesConfig.placeholders) === '[object Object]'
-          ? this.pagesConfig.placeholders
-          : {};
+        ? this.pagesConfig.placeholders
+        : {};
     if (configPlaceholders instanceof Promise) {
       configPlaceholders = await configPlaceholders;
     }
@@ -543,10 +543,10 @@ export class PagesRouter extends PromiseRouter {
   getDefaultParams(config) {
     return config
       ? {
-        [pageParams.appId]: config.appId,
-        [pageParams.appName]: config.appName,
-        [pageParams.publicServerUrl]: config.publicServerURL,
-      }
+          [pageParams.appId]: config.appId,
+          [pageParams.appName]: config.appName,
+          [pageParams.publicServerUrl]: config.publicServerURL,
+        }
       : {};
   }
 
