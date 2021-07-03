@@ -135,6 +135,7 @@ ___
 - Fix incorrect LiveQuery events triggered for multiple subscriptions on the same class with different events [#7341](https://github.com/parse-community/parse-server/pull/7341)
 - Fix select and excludeKey queries to properly accept JSON string arrays. Also allow nested fields in exclude (Corey Baker) [#7242](https://github.com/parse-community/parse-server/pull/7242)
 - Fix LiveQuery server crash when using $all query operator on a missing object key (Jason Posthuma) [#7421](https://github.com/parse-community/parse-server/pull/7421)
+- Add context header X-Parse-Cloud-Context (Corey Baker) [#7437](https://github.com/parse-community/parse-server/pull/7437)
 
 ___
 ## 4.5.0
