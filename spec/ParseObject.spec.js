@@ -260,18 +260,13 @@ describe('Parse.Object testing', () => {
     );
   });
 
-  it('cannot set invalid date', async function (done) {
-    const obj = new Parse.Object('TestObject');
-    obj.set('when', new Date(Date.parse(null)));
-    try {
-      await obj.save();
-    } catch (e) {
-      ok(true);
-      done();
-      return;
+  it('cannot set invalid date', async () => {
+    const dates = [new Date(Date.parse(null)), { __type: 'Date', iso: 'invalidIsoDate' }];
+    for (const date of dates) {
+      const obj = new Parse.Object('TestObject');
+      obj.set('when', date);
+      await expectAsync(obj.save()).toBeRejectedWithError('Tried to encode an invalid date.');
     }
-    ok(false, 'Saving an invalid date should throw');
-    done();
   });
 
   it('can set authData when not user class', async () => {
