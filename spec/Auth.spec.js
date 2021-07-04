@@ -241,4 +241,48 @@ describe('Auth', () => {
       expect(cloudRoles2.length).toBe(rolesNumber);
     });
   });
+
+  fit('succes to login when masterkey and instalationId is provided and when password is not provided', async () => {
+    const user = new Parse.User();
+    const savedUser = await user.save({
+      username: 'yolo',
+      password: 'yolopass',
+      email: 'yo@lo.com',
+    });
+    const installationId = '123456789';
+    const query = new Parse.Query(Parse.User);
+    const result = await query.get(savedUser.id, {
+      useMasterKey: true,
+      installationId: installationId,
+    });
+
+    try {
+      await result.logIn({ useMasterKey: true, installationId: installationId });
+    } catch (error) {
+      fail(error.message);
+    }
+  });
+
+  fit('succes to get session token when masterkey and instalationId is provided', async () => {
+    const user = new Parse.User();
+    user.set('username', 'yolo');
+    user.set('password', 'yolopass');
+    user.set('email', 'yo@lo.com');
+    const savedUser = await user.signUp();
+
+    const installationId = '123456789';
+    const querySession = new Parse.Query(Parse.Session);
+    const session = await querySession.first();
+
+    expect(session).not.toBeUndefined();
+
+    const userQuery = new Parse.Query(Parse.User);
+    const result = await userQuery.get(savedUser.id, {
+      useMasterKey: true,
+      installationId: installationId,
+    });
+
+    const userSession = result.getSessionToken();
+    expect(userSession).toEqual(session);
+  });
 });
