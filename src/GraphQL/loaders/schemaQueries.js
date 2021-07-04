@@ -1,4 +1,5 @@
 import Parse from 'parse/node';
+import deepcopy from 'deepcopy';
 import { GraphQLNonNull, GraphQLList } from 'graphql';
 import { transformToGraphQL } from '../transformers/schemaFields';
 import * as schemaTypes from './schemaTypes';
@@ -27,7 +28,7 @@ const load = parseGraphQLSchema => {
       type: new GraphQLNonNull(schemaTypes.CLASS),
       resolve: async (_source, args, context) => {
         try {
-          const { name } = args;
+          const { name } = deepcopy(args);
           const { config, auth } = context;
 
           enforceMasterKeyAccess(auth);

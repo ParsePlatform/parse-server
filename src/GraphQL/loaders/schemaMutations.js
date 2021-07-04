@@ -1,5 +1,6 @@
 import Parse from 'parse/node';
 import { GraphQLNonNull } from 'graphql';
+import deepcopy from 'deepcopy';
 import { mutationWithClientMutationId } from 'graphql-relay';
 import * as schemaTypes from './schemaTypes';
 import { transformToParse, transformToGraphQL } from '../transformers/schemaFields';
@@ -26,7 +27,7 @@ const load = parseGraphQLSchema => {
     },
     mutateAndGetPayload: async (args, context) => {
       try {
-        const { name, schemaFields } = args;
+        const { name, schemaFields } = deepcopy(args);
         const { config, auth } = context;
 
         enforceMasterKeyAccess(auth);
@@ -75,7 +76,7 @@ const load = parseGraphQLSchema => {
     },
     mutateAndGetPayload: async (args, context) => {
       try {
-        const { name, schemaFields } = args;
+        const { name, schemaFields } = deepcopy(args);
         const { config, auth } = context;
 
         enforceMasterKeyAccess(auth);
@@ -126,7 +127,7 @@ const load = parseGraphQLSchema => {
     },
     mutateAndGetPayload: async (args, context) => {
       try {
-        const { name } = args;
+        const { name } = deepcopy(args);
         const { config, auth } = context;
 
         enforceMasterKeyAccess(auth);
