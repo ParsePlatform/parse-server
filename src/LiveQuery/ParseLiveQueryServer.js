@@ -10,7 +10,7 @@ import { ParsePubSub } from './ParsePubSub';
 import SchemaController from '../Controllers/SchemaController';
 import _ from 'lodash';
 import { v4 as uuidv4 } from 'uuid';
-import { runLiveQueryEventHandlers, getTrigger, runTrigger } from '../triggers';
+import { runLiveQueryEventHandlers, getTrigger, runTrigger, toJSONwithObjects } from '../triggers';
 import { getAuthForSessionToken, Auth } from '../Auth';
 import { getCacheController } from '../Controllers';
 import LRU from 'lru-cache';
@@ -183,8 +183,7 @@ class ParseLiveQueryServer {
               return;
             }
             if (res.object && typeof res.object.toJSON === 'function') {
-              deletedParseObject = res.object.toJSON();
-              deletedParseObject.className = className;
+              deletedParseObject = toJSONwithObjects(res.object, res.object.className || className);
             }
             client.pushDelete(requestId, deletedParseObject);
           } catch (error) {
@@ -329,13 +328,13 @@ class ParseLiveQueryServer {
               return;
             }
             if (res.object && typeof res.object.toJSON === 'function') {
-              currentParseObject = res.object.toJSON();
-              currentParseObject.className = res.object.className || className;
+              currentParseObject = toJSONwithObjects(res.object, res.object.className || className);
             }
-
             if (res.original && typeof res.original.toJSON === 'function') {
-              originalParseObject = res.original.toJSON();
-              originalParseObject.className = res.original.className || className;
+              originalParseObject = toJSONwithObjects(
+                res.original,
+                res.original.className || className
+              );
             }
             const functionName = 'push' + res.event.charAt(0).toUpperCase() + res.event.slice(1);
             if (client[functionName]) {

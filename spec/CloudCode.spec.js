@@ -2383,6 +2383,25 @@ describe('afterFind hooks', () => {
     });
   });
 
+  it('can set a pointer object in afterFind', async done => {
+    const obj = new Parse.Object('MyObject');
+    await obj.save();
+    Parse.Cloud.afterFind('MyObject', async ({ objects }) => {
+      const otherObject = new Parse.Object('Test');
+      otherObject.set('foo', 'bar');
+      await otherObject.save();
+      objects[0].set('Pointer', otherObject);
+      expect(objects[0].get('Pointer').get('foo')).toBe('bar');
+      return objects;
+    });
+    const query = new Parse.Query('MyObject');
+    query.equalTo('objectId', obj.id);
+    const [obj2] = await query.find();
+    const pointer = obj2.get('Pointer');
+    expect(pointer.get('foo')).toBe('bar');
+    done();
+  });
+
   it('should have request headers', done => {
     Parse.Cloud.afterFind('MyObject', req => {
       expect(req.headers).toBeDefined();

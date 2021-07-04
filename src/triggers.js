@@ -161,6 +161,28 @@ export function _unregisterAll() {
   Object.keys(_triggerStore).forEach(appId => delete _triggerStore[appId]);
 }
 
+export function toJSONwithObjects(object, className) {
+  if (!object || !object.toJSON) {
+    return {};
+  }
+  const toJSON = object.toJSON();
+  for (const key of Object.keys(toJSON)) {
+    const val = toJSON[key];
+    if (!val || !val.__type || val.__type !== 'Pointer') {
+      continue;
+    }
+    const pointer = object.get(key);
+    const json = pointer.toJSON();
+    json.className = pointer.className;
+    json.__type = 'Object';
+    toJSON[key] = json;
+  }
+  if (className) {
+    toJSON.className = className;
+  }
+  return toJSON;
+}
+
 export function getTrigger(className, triggerType, applicationId) {
   if (!applicationId) {
     throw 'Missing ApplicationID';
@@ -316,7 +338,7 @@ export function getResponseObject(request, resolve, reject) {
           response = request.objects;
         }
         response = response.map(object => {
-          return object.toJSON();
+          return toJSONwithObjects(object);
         });
         return resolve(response);
       }
