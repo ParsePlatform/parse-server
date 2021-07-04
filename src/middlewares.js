@@ -361,11 +361,11 @@ export function handleParseErrors(err, req, res, next) {
         httpStatus = 400;
     }
     res.status(httpStatus);
-    res.json({ code: err.code, error: err.message });
+    res.json({ code: err.code, message: err.message });
     log.error('Parse error: ', err);
   } else if (err.status && err.message) {
     res.status(err.status);
-    res.json({ error: err.message });
+    res.json({ message: err.message });
     if (!(process && process.env.TESTING)) {
       next(err);
     }
