@@ -9,6 +9,17 @@ export default {
     return this.all().find(cached => cached.className === className);
   },
 
+  set(className, schema) {
+    const cache = this.all();
+    const index = cache.findIndex(cached => cached.className === className);
+    if (index >= 0) {
+      cache[index] = schema;
+    } else {
+      cache.push(schema);
+    }
+    this.put(cache);
+  },
+
   put(allSchema) {
     SchemaCache.allClasses = allSchema;
   },
