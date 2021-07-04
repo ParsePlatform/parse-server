@@ -894,7 +894,7 @@ class DatabaseController {
       if (object[field] && object[field].__op && object[field].__op === 'Delete') {
         return false;
       }
-      return schemaFields.indexOf(field) < 0;
+      return schemaFields.indexOf(getRootFieldName(field)) < 0;
     });
     if (newKeys.length > 0) {
       // adds a marker that new field is being adding during update

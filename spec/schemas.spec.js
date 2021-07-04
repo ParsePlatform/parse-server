@@ -1779,6 +1779,34 @@ describe('schemas', () => {
     });
   });
 
+  describe('Nested documents', () => {
+    beforeAll(async () => {
+      const testSchema = new Parse.Schema('test_7371');
+      testSchema.setCLP({
+        create: { ['*']: true },
+        update: { ['*']: true },
+        addField: {},
+      });
+      testSchema.addObject('a');
+      await testSchema.save();
+    });
+
+    it('addField not required for adding a nested field (#7371)', async () => {
+      const obj = new Parse.Object('test_7371');
+      obj.set('a', {});
+      await obj.save();
+      obj.set('a.b', 2);
+      await obj.save();
+    });
+    it('addField not required for modifying a nested field (#7371)', async () => {
+      const obj = new Parse.Object('test_7371');
+      obj.set('a', { b: 1 });
+      await obj.save();
+      obj.set('a.b', 2);
+      await obj.save();
+    });
+  });
+
   it('should aceept class-level permission with userid of any length', async done => {
     await global.reconfigureServer({
       customIdSize: 11,
