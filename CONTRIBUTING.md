@@ -19,6 +19,7 @@
     - [Wording Guideline](#wording-guideline)
   - [Parse Error](#parse-error)
   - [Parse Server Configuration](#parse-server-configuration)
+- [Versioning](#versioning)
 - [Code of Conduct](#code-of-conduct)
 
 ## Contributing
@@ -280,6 +281,26 @@ Introducing new [Parse Server configuration][config] parameters requires the fol
 1. Add parameter value validation in [/src/Config.js](https://github.com/parse-community/parse-server/blob/master/src/Config.js).
 1. Add test cases to ensure the correct parameter value validation. Parse Server throws an error at launch if an invalid value is set for any configuration parameter.
 1. Execute `npm run docs` to generate the documentation in the `/out` directory. Take a look at the documentation whether the description and formatting of the newly introduced parameters is satisfactory.
+
+## Versioning
+
+> The following versioning system is applied since Parse Server 5.0.0 and does not necessarily apply to previous releases.
+
+Parse Server follows [semantic versioning](https://semver.org) with a flavor of [calendric versioning](https://calver.org). Semantic versioning makes Parse Server easy to upgrade because breaking changes only occur in major releases. Calendric versioning gives an additional sense of how old a Parse Server release is and allows for future Long-Term Support concepts, which Parse Server currently does not provide.
+
+Syntax: `[major]`**.**`[minor]`**.**`[patch]`**-**`[pre-release-label]`
+
+- The `major` version increments with the first release of every year and may include changes that are *not* backwards compatible.
+- The `minor` version increments during the year and may include new features or improvements of existing features that are backwards compatible.
+- The `patch` version increments during the year and may include bug fixes that are backwards compatible.
+- The `pre-release-label` is optional for pre-release versions such as:
+  - `-alpha` (likely to contain bugs, likely to change in features until release)
+  - `-beta` (likely to contain bugs, no change in features until release)
+  - `-rc0` (unlikely to contain bugs, no change in features until release)
+
+Exceptions:
+- The `major` version may increment during the year in the unlikely event that a breaking change is so urgent that it cannot wait for the next yearly release. An example would be a vulnerability fix that leads to an unavoidable breaking change.
+- Bug fixes of security vulnerabilities are `patch` releases, unless they cause a breaking change, then they are `major` releases.
 
 ## Code of Conduct
 
