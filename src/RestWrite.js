@@ -14,6 +14,7 @@ var ClientSDK = require('./ClientSDK');
 import RestQuery from './RestQuery';
 import _ from 'lodash';
 import logger from './logger';
+import { ErrorMessage } from './Constants/message';
 
 // query and data are both provided in REST API format. So data
 // types are encoded by plain old objects.
@@ -26,10 +27,7 @@ import logger from './logger';
 // for the _User class.
 function RestWrite(config, auth, className, query, data, originalData, clientSDK, context, action) {
   if (auth.isReadOnly) {
-    throw new Parse.Error(
-      Parse.Error.OPERATION_FORBIDDEN,
-      'Cannot perform a write operation when using readOnlyMasterKey'
-    );
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, ErrorMessage.READ_ONLY_MASTER_KEY());
   }
   this.config = config;
   this.auth = auth;
@@ -46,17 +44,17 @@ function RestWrite(config, auth, className, query, data, originalData, clientSDK
   if (!query) {
     if (this.config.allowCustomObjectId) {
       if (Object.prototype.hasOwnProperty.call(data, 'objectId') && !data.objectId) {
-        throw new Parse.Error(
-          Parse.Error.MISSING_OBJECT_ID,
-          'objectId must not be empty, null or undefined'
-        );
+        throw new Parse.Error(Parse.Error.MISSING_OBJECT_ID, ErrorMessage.MISSING_OBJECT_ID());
       }
     } else {
       if (data.objectId) {
-        throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, 'objectId is an invalid field name.');
+        throw new Parse.Error(
+          Parse.Error.INVALID_KEY_NAME,
+          ErrorMessage.INVALID_KEY_NAME('objectId')
+        );
       }
       if (data.id) {
-        throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, 'id is an invalid field name.');
+        throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, ErrorMessage.INVALID_KEY_NAME('id'));
       }
     }
   }
@@ -178,7 +176,7 @@ RestWrite.prototype.validateClientClassCreation = function () {
         if (hasClass !== true) {
           throw new Parse.Error(
             Parse.Error.OPERATION_FORBIDDEN,
-            'This user is not allowed to access ' + 'non-existent class: ' + this.className
+            ErrorMessage.USER_NO_ACCESS_CLASS(this.className)
           );
         }
       });
@@ -250,7 +248,7 @@ RestWrite.prototype.runBeforeSaveTrigger = function () {
       // In the case that there is no permission for the operation, it throws an error
       return databasePromise.then(result => {
         if (!result || result.length <= 0) {
-          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found.');
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, ErrorMessage.OBJECT_NOT_FOUND());
         }
       });
     })
@@ -337,7 +335,10 @@ RestWrite.prototype.setRequiredFieldsIfNeeded = function () {
               this.storage.fieldsChangedByTrigger.push(fieldName);
             }
           } else if (schema.fields[fieldName] && schema.fields[fieldName].required === true) {
-            throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `${fieldName} is required`);
+            throw new Parse.Error(
+              Parse.Error.VALIDATION_ERROR,
+              ErrorMessage.FIELD_IS_REQUIRED(fieldName)
+            );
           }
         }
       };
@@ -376,10 +377,10 @@ RestWrite.prototype.validateAuthData = function () {
 
   if (!this.query && !this.data.authData) {
     if (typeof this.data.username !== 'string' || _.isEmpty(this.data.username)) {
-      throw new Parse.Error(Parse.Error.USERNAME_MISSING, 'bad or missing username');
+      throw new Parse.Error(Parse.Error.USERNAME_MISSING, ErrorMessage.USERNAME_MISSING());
     }
     if (typeof this.data.password !== 'string' || _.isEmpty(this.data.password)) {
-      throw new Parse.Error(Parse.Error.PASSWORD_MISSING, 'password is required');
+      throw new Parse.Error(Parse.Error.PASSWORD_MISSING, ErrorMessage.PASSWORD_MISSING());
     }
   }
 
@@ -391,10 +392,7 @@ RestWrite.prototype.validateAuthData = function () {
     return;
   } else if (Object.prototype.hasOwnProperty.call(this.data, 'authData') && !this.data.authData) {
     // Handle saving authData to null
-    throw new Parse.Error(
-      Parse.Error.UNSUPPORTED_SERVICE,
-      'This authentication method is unsupported.'
-    );
+    throw new Parse.Error(Parse.Error.UNSUPPORTED_SERVICE, ErrorMessage.UNSUPPORTED_SERVICE());
   }
 
   var authData = this.data.authData;
@@ -409,10 +407,7 @@ RestWrite.prototype.validateAuthData = function () {
       return this.handleAuthData(authData);
     }
   }
-  throw new Parse.Error(
-    Parse.Error.UNSUPPORTED_SERVICE,
-    'This authentication method is unsupported.'
-  );
+  throw new Parse.Error(Parse.Error.UNSUPPORTED_SERVICE, ErrorMessage.UNSUPPORTED_SERVICE());
 };
 
 RestWrite.prototype.handleAuthDataValidation = function (authData) {
@@ -422,10 +417,7 @@ RestWrite.prototype.handleAuthDataValidation = function (authData) {
     }
     const validateAuthData = this.config.authDataManager.getValidatorForProvider(provider);
     if (!validateAuthData) {
-      throw new Parse.Error(
-        Parse.Error.UNSUPPORTED_SERVICE,
-        'This authentication method is unsupported.'
-      );
+      throw new Parse.Error(Parse.Error.UNSUPPORTED_SERVICE, ErrorMessage.UNSUPPORTED_SERVICE());
     }
     return validateAuthData(authData[provider]);
   });
@@ -549,7 +541,7 @@ RestWrite.prototype.handleAuthData = function (authData) {
         // Trying to update auth data but users
         // are different
         if (userResult.objectId !== userId) {
-          throw new Parse.Error(Parse.Error.ACCOUNT_ALREADY_LINKED, 'this auth is already used');
+          throw new Parse.Error(Parse.Error.ACCOUNT_ALREADY_LINKED, ErrorMessage.ACCOUNT_LINKED());
         }
         // No auth data was mutated, just keep going
         if (!hasMutatedAuthData) {
@@ -560,7 +552,7 @@ RestWrite.prototype.handleAuthData = function (authData) {
     return this.handleAuthDataValidation(authData).then(() => {
       if (results.length > 1) {
         // More than 1 user with the passed id's
-        throw new Parse.Error(Parse.Error.ACCOUNT_ALREADY_LINKED, 'this auth is already used');
+        throw new Parse.Error(Parse.Error.ACCOUNT_ALREADY_LINKED, ErrorMessage.ACCOUNT_LINKED());
       }
     });
   });
@@ -575,8 +567,10 @@ RestWrite.prototype.transformUser = function () {
   }
 
   if (!this.auth.isMaster && 'emailVerified' in this.data) {
-    const error = `Clients aren't allowed to manually update email verification.`;
-    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, error);
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      ErrorMessage.CLIENT_EMAIL_VERIFICATION()
+    );
   }
 
   // Do not cleanup session if objectId is not set
@@ -658,10 +652,7 @@ RestWrite.prototype._validateUserName = function () {
     )
     .then(results => {
       if (results.length > 0) {
-        throw new Parse.Error(
-          Parse.Error.USERNAME_TAKEN,
-          'Account already exists for this username.'
-        );
+        throw new Parse.Error(Parse.Error.USERNAME_TAKEN, ErrorMessage.USERNAME_TAKEN());
       }
       return;
     });
@@ -686,7 +677,10 @@ RestWrite.prototype._validateEmail = function () {
   // Validate basic email address format
   if (!this.data.email.match(/^.+@.+$/)) {
     return Promise.reject(
-      new Parse.Error(Parse.Error.INVALID_EMAIL_ADDRESS, 'Email address format is invalid.')
+      new Parse.Error(
+        Parse.Error.INVALID_EMAIL_ADDRESS,
+        ErrorMessage.INVALID_EMAIL_ADDRESS_FORMAT()
+      )
     );
   }
   // Case insensitive match, see note above function.
@@ -703,10 +697,7 @@ RestWrite.prototype._validateEmail = function () {
     )
     .then(results => {
       if (results.length > 0) {
-        throw new Parse.Error(
-          Parse.Error.EMAIL_TAKEN,
-          'Account already exists for this email address.'
-        );
+        throw new Parse.Error(Parse.Error.EMAIL_TAKEN, ErrorMessage.EMAIL_TAKEN());
       }
       if (
         !this.data.authData ||
@@ -739,8 +730,8 @@ RestWrite.prototype._validatePasswordRequirements = function () {
   // b. making a custom password reset page that shows the requirements
   const policyError = this.config.passwordPolicy.validationError
     ? this.config.passwordPolicy.validationError
-    : 'Password does not meet the Password Policy requirements.';
-  const containsUsernameError = 'Password cannot contain your username.';
+    : ErrorMessage.PASSWORD_POLICY();
+  const containsUsernameError = ErrorMessage.USERNAME_IN_PASSWORD();
 
   // check whether the password meets the password strength requirements
   if (
@@ -817,7 +808,9 @@ RestWrite.prototype._validatePasswordHistory = function () {
               return Promise.reject(
                 new Parse.Error(
                   Parse.Error.VALIDATION_ERROR,
-                  `New password should not be the same as last ${this.config.passwordPolicy.maxPasswordHistory} passwords.`
+                  ErrorMessage.PASSWORD_MATCHES_EXISTING_PASSWORD(
+                    this.config.passwordPolicy.maxPasswordHistory
+                  )
                 )
               );
             throw err;
@@ -982,12 +975,12 @@ RestWrite.prototype.handleSession = function () {
   }
 
   if (!this.auth.user && !this.auth.isMaster) {
-    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Session token required.');
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, ErrorMessage.INVALID_SESSION_TOKEN());
   }
 
   // TODO: Verify proper error to throw
   if (this.data.ACL) {
-    throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, 'Cannot set ' + 'ACL on a Session.');
+    throw new Parse.Error(Parse.Error.INVALID_KEY_NAME, ErrorMessage.ACL_SESSION());
   }
 
   if (this.query) {
@@ -1019,7 +1012,7 @@ RestWrite.prototype.handleSession = function () {
 
     return createSession().then(results => {
       if (!results.response) {
-        throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'Error creating session.');
+        throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, ErrorMessage.SESSION_ERROR());
       }
       sessionData['objectId'] = results.response['objectId'];
       this.response = {
@@ -1047,10 +1040,7 @@ RestWrite.prototype.handleInstallation = function () {
     !this.data.installationId &&
     !this.auth.installationId
   ) {
-    throw new Parse.Error(
-      135,
-      'at least one ID field (deviceToken, installationId) ' + 'must be specified in this operation'
-    );
+    throw new Parse.Error(135, ErrorMessage.MIN_ONE_ID_FIELD());
   }
 
   // If the device token is 64 characters long, we assume it is for iOS
@@ -1133,14 +1123,14 @@ RestWrite.prototype.handleInstallation = function () {
       // Sanity checks when running a query
       if (this.query && this.query.objectId) {
         if (!objectIdMatch) {
-          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Object not found for update.');
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, ErrorMessage.UNKNOWN_OBJECT_UPDATE());
         }
         if (
           this.data.installationId &&
           objectIdMatch.installationId &&
           this.data.installationId !== objectIdMatch.installationId
         ) {
-          throw new Parse.Error(136, 'installationId may not be changed in this ' + 'operation');
+          throw new Parse.Error(136, ErrorMessage.NO_OP('installationId'));
         }
         if (
           this.data.deviceToken &&
@@ -1149,14 +1139,14 @@ RestWrite.prototype.handleInstallation = function () {
           !this.data.installationId &&
           !objectIdMatch.installationId
         ) {
-          throw new Parse.Error(136, 'deviceToken may not be changed in this ' + 'operation');
+          throw new Parse.Error(136, ErrorMessage.NO_OP('deviceToken'));
         }
         if (
           this.data.deviceType &&
           this.data.deviceType &&
           this.data.deviceType !== objectIdMatch.deviceType
         ) {
-          throw new Parse.Error(136, 'deviceType may not be changed in this ' + 'operation');
+          throw new Parse.Error(136, ErrorMessage.NO_OP('deviceType'));
         }
       }
 
@@ -1169,7 +1159,7 @@ RestWrite.prototype.handleInstallation = function () {
       }
       // need to specify deviceType only if it's new
       if (!this.query && !this.data.deviceType && !idMatch) {
-        throw new Parse.Error(135, 'deviceType must be specified in this operation');
+        throw new Parse.Error(135, ErrorMessage.REQ_OP('deviceType'));
       }
     })
     .then(() => {
@@ -1185,11 +1175,7 @@ RestWrite.prototype.handleInstallation = function () {
           // can just return the match.
           return deviceTokenMatches[0]['objectId'];
         } else if (!this.data.installationId) {
-          throw new Parse.Error(
-            132,
-            'Must specify installationId when deviceToken ' +
-              'matches multiple Installation objects'
-          );
+          throw new Parse.Error(132, ErrorMessage.INSTALLATION_ID_WITH_DEVICE_TOKEN());
         } else {
           // Multiple device token matches and we specified an installation ID,
           // or a single match where both the passed and matching objects have
@@ -1311,7 +1297,7 @@ RestWrite.prototype.runDatabaseOperation = function () {
   if (this.className === '_User' && this.query && this.auth.isUnauthenticated()) {
     throw new Parse.Error(
       Parse.Error.SESSION_MISSING,
-      `Cannot modify user ${this.query.objectId}.`
+      ErrorMessage.USER_NO_MODIFY(this.query.objectId)
     );
   }
 
@@ -1322,7 +1308,7 @@ RestWrite.prototype.runDatabaseOperation = function () {
   // TODO: Add better detection for ACL, ensuring a user can't be locked from
   //       their own user record.
   if (this.data.ACL && this.data.ACL['*unresolved']) {
-    throw new Parse.Error(Parse.Error.INVALID_ACL, 'Invalid ACL.');
+    throw new Parse.Error(Parse.Error.INVALID_ACL, ErrorMessage.INVALID_ACL());
   }
 
   if (this.query) {
@@ -1426,17 +1412,11 @@ RestWrite.prototype.runDatabaseOperation = function () {
 
         // Quick check, if we were able to infer the duplicated field name
         if (error && error.userInfo && error.userInfo.duplicated_field === 'username') {
-          throw new Parse.Error(
-            Parse.Error.USERNAME_TAKEN,
-            'Account already exists for this username.'
-          );
+          throw new Parse.Error(Parse.Error.USERNAME_TAKEN, ErrorMessage.USERNAME_TAKEN());
         }
 
         if (error && error.userInfo && error.userInfo.duplicated_field === 'email') {
-          throw new Parse.Error(
-            Parse.Error.EMAIL_TAKEN,
-            'Account already exists for this email address.'
-          );
+          throw new Parse.Error(Parse.Error.EMAIL_TAKEN, ErrorMessage.EMAIL_TAKEN());
         }
 
         // If this was a failed user creation due to username or email already taken, we need to
@@ -1454,10 +1434,7 @@ RestWrite.prototype.runDatabaseOperation = function () {
           )
           .then(results => {
             if (results.length > 0) {
-              throw new Parse.Error(
-                Parse.Error.USERNAME_TAKEN,
-                'Account already exists for this username.'
-              );
+              throw new Parse.Error(Parse.Error.USERNAME_TAKEN, ErrorMessage.USERNAME_TAKEN());
             }
             return this.config.database.find(
               this.className,
@@ -1467,15 +1444,9 @@ RestWrite.prototype.runDatabaseOperation = function () {
           })
           .then(results => {
             if (results.length > 0) {
-              throw new Parse.Error(
-                Parse.Error.EMAIL_TAKEN,
-                'Account already exists for this email address.'
-              );
+              throw new Parse.Error(Parse.Error.EMAIL_TAKEN, ErrorMessage.EMAIL_TAKEN());
             }
-            throw new Parse.Error(
-              Parse.Error.DUPLICATE_VALUE,
-              'A duplicate value for a field with unique values was provided'
-            );
+            throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, ErrorMessage.DUPLICATE_VALUE());
           });
       })
       .then(response => {
