@@ -18,6 +18,7 @@ export const Types = {
   afterDeleteFile: 'afterDeleteFile',
   beforeConnect: 'beforeConnect',
   beforeSubscribe: 'beforeSubscribe',
+  beforeUnsubscribe: 'beforeUnsubscribe',
   afterEvent: 'afterEvent',
 };
 

@@ -678,6 +678,42 @@ ParseCloud.onLiveQueryEvent = function (handler) {
 };
 
 /**
+ * Registers a before live query subscription function.
+ *
+ * **Available in Cloud Code only.**
+ *
+ * If you want to use beforeUnsubscribe for a predefined class in the Parse JavaScript SDK (e.g. {@link Parse.User}), you should pass the class itself and not the String for arg1.
+ * ```
+ * Parse.Cloud.beforeUnsubscribe('MyCustomClass', (request) => {
+ *   // code here
+ * }, (request) => {
+ *   // validation code here
+ * });
+ *
+ * Parse.Cloud.beforeUnsubscribe(Parse.User, (request) => {
+ *   // code here
+ * }, { ...validationObject });
+ *```
+ *
+ * @method beforeUnsubscribe
+ * @name Parse.Cloud.beforeUnsubscribe
+ * @param {(String|Parse.Object)} arg1 The Parse.Object subclass to register the before subscription function for. This can instead be a String that is the className of the subclass.
+ * @param {Function} func The function to run before a subscription. This function can be async and should take one parameter, a {@link Parse.Cloud.TriggerRequest}.
+ * @param {(Object|Function)} validator An optional function to help validating cloud code. This function can be an async function and should take one parameter a {@link Parse.Cloud.TriggerRequest}, or a {@link Parse.Cloud.ValidatorObject}.
+ */
+ParseCloud.beforeUnsubscribe = function (parseClass, handler, validationHandler) {
+  validateValidator(validationHandler);
+  var className = getClassName(parseClass);
+  triggers.addTrigger(
+    triggers.Types.beforeUnsubscribe,
+    className,
+    handler,
+    Parse.applicationId,
+    validationHandler
+  );
+};
+
+/**
  * Registers an after live query server event function.
  *
  * **Available in Cloud Code only.**
