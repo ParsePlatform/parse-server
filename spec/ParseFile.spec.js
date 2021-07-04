@@ -390,6 +390,108 @@ describe('Parse.File testing', () => {
       });
     });
 
+    it('supports files in json that inside of array', async done => {
+      const oldBaseUrl = "http://old-file-url.example.com";
+      const newBaseUrl = "http://new-file-url.example.com";
+
+      const mockAdapterOld = {
+        createFile: async filename => ({
+          name: filename,
+          location: `${oldBaseUrl}/${filename}`,
+        }),
+        deleteFile: () => {},
+        getFileData: () => {},
+        getFileLocation: (config, filename) => `${oldBaseUrl}/${filename}`,
+        validateFilename: () => {
+          return null;
+        },
+      };
+      await reconfigureServer({ filesAdapter: mockAdapterOld });
+
+      const base64 = "V29ya2luZyBhdCBQYXJzZSBpcyBncmVhdCE=";
+      const file = new Parse.File("myFile", { base64: base64 });
+
+      const jsonItem = {"file": file};
+
+      const fileArray = [jsonItem];
+      const obj = new Parse.Object('FilesInJsonInArrayTest');
+      obj.set('files', fileArray);
+      await obj.save();
+
+      const mockAdapterNew = {
+        createFile: async filename => ({
+          name: filename,
+          location: `${newBaseUrl}/${filename}`,
+        }),
+        deleteFile: () => {},
+        getFileData: () => {},
+        getFileLocation: (config, filename) => `${newBaseUrl}/${filename}`,
+        validateFilename: () => {
+          return null;
+        },
+      };
+      await reconfigureServer({ filesAdapter: mockAdapterNew });
+
+      const query = new Parse.Query('FilesInJsonInArrayTest');
+      const result = await query.first();
+
+      const filesAgain = result.get('files');
+      expect(filesAgain.length).toEqual(1);
+      expect(filesAgain[0].file.name()).toMatch(/myFile/);
+      expect(filesAgain[0].file.url()).toEqual(newBaseUrl + '/' + filesAgain[0].file.name());
+      done();
+    });
+
+    it('supports files in array', async done => {
+      const oldBaseUrl = "http://old-file-url.example.com";
+      const newBaseUrl = "http://new-file-url.example.com";
+
+      const mockAdapterOld = {
+        createFile: async filename => ({
+          name: filename,
+          location: `${oldBaseUrl}/${filename}`,
+        }),
+        deleteFile: () => {},
+        getFileData: () => {},
+        getFileLocation: (config, filename) => `${oldBaseUrl}/${filename}`,
+        validateFilename: () => {
+          return null;
+        },
+      };
+      await reconfigureServer({ filesAdapter: mockAdapterOld });
+
+      const base64 = "V29ya2luZyBhdCBQYXJzZSBpcyBncmVhdCE=";
+      const file = new Parse.File("myFile", { base64: base64 });
+
+      const fileArray = [file];
+      const obj = new Parse.Object('FilesInArrayTest');
+      obj.set('files', fileArray);
+      await obj.save();
+
+      const mockAdapterNew = {
+        createFile: async filename => ({
+          name: filename,
+          location: `${newBaseUrl}/${filename}`,
+        }),
+        deleteFile: () => {},
+        getFileData: () => {},
+        getFileLocation: (config, filename) => `${newBaseUrl}/${filename}`,
+        validateFilename: () => {
+          return null;
+        },
+      };
+      await reconfigureServer({ filesAdapter: mockAdapterNew });
+
+      const query = new Parse.Query('FilesInArrayTest');
+      const result = await query.first();
+
+      const filesAgain = result.get('files');
+      expect(filesAgain.length).toEqual(1);
+      expect(filesAgain[0].name()).toMatch(/myFile/);
+      expect(filesAgain[0].url()).toEqual(newBaseUrl + '/' + filesAgain[0].name());
+      done();
+    });
+
     it('supports array of files', done => {
       const file = {
         __type: 'File',
