@@ -136,10 +136,12 @@ export function pushStatusHandler(config, existingObjectId) {
   const setInitial = function (body = {}, where, options = { source: 'rest' }) {
     const now = new Date();
     let pushTime = now.toISOString();
+    let pushDate = now;
     let status = 'pending';
     if (Object.prototype.hasOwnProperty.call(body, 'push_time')) {
       if (config.hasPushScheduledSupport) {
         pushTime = body.push_time;
+        pushDate = new Date(body.push_time);
         status = 'scheduled';
       } else {
         logger.warn('Trying to schedule a push while server is not configured.');
@@ -166,6 +168,7 @@ export function pushStatusHandler(config, existingObjectId) {
       expiry: body.expiration_time,
       expiration_interval: body.expiration_interval,
       status: status,
+      pushDate: { iso: pushDate, __type: 'Date' },
       numSent: 0,
       pushHash,
       // lockdown!

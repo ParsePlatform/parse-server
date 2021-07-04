@@ -88,6 +88,7 @@ const defaultColumns: { [string]: SchemaFields } = Object.freeze({
   },
   _PushStatus: {
     pushTime: { type: 'String' },
+    pushDate: { type: 'Date' }, // to improve speed for tolling Scheduled Pushs
     source: { type: 'String' }, // rest or webui
     query: { type: 'String' }, // the stringified JSON query
     payload: { type: 'String' }, // the stringified JSON payload,

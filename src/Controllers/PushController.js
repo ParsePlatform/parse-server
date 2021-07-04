@@ -120,6 +120,80 @@ export class PushController {
       });
   }
 
+  sendScheduledPush(pushObject, config, auth, now = new Date()) {
+    if (!config.hasPushSupport) {
+      throw new Parse.Error(
+        Parse.Error.PUSH_MISCONFIGURED,
+        'Missing push configuration'
+      );
+    }
+
+    // translate parseObject to body
+    const body = {};
+    if (pushObject.has('pushTime')) body.push_time = pushObject.get('pushTime');
+    if (pushObject.has('expiry'))
+      body.expiration_time = pushObject.get('expiry');
+    if (pushObject.has('expiration_interval'))
+      body.expiration_interval = pushObject.get('expiration_interval');
+    if (pushObject.has('payload'))
+      body.data = JSON.parse(pushObject.get('payload'));
+
+    const where = JSON.parse(pushObject.get('query'));
+
+    // Replace the expiration_time and push_time with a valid Unix epoch milliseconds time
+    body.expiration_time = PushController.getExpirationTime(body);
+    body.expiration_interval = PushController.getExpirationInterval(body);
+    if (body.expiration_time && body.expiration_interval) {
+      throw new Parse.Error(
+        Parse.Error.PUSH_MISCONFIGURED,
+        'Both expiration_time and expiration_interval cannot be set'
+      );
+    }
+
+    // calculate and set the expiration_time for APNS and GCM to use
+    if (
+      body.expiration_interval &&
+      !Object.prototype.hasOwnProperty.call(body, 'push_time')
+    ) {
+      const ttlMs = body.expiration_interval * 1000;
+      body.expiration_time = new Date(now.valueOf() + ttlMs).valueOf();
+    }
+
+    const pushTime = PushController.getPushTime(body);
+    if (pushTime && pushTime.date !== 'undefined') {
+      body['push_time'] = PushController.formatPushTime(pushTime);
+    }
+
+    // TODO: currently we increment the badge when we schedule the push.
+    //       We should consider waiting to increment the badge until the
+    //       actual push is sent here. This would prevent a "ghost badge"
+    //       where the user sees a "1" in their app but the notifcation
+    //       hasn't been sent yet. Until we make that breaking change
+    //       lets comment this out to make sure we dont increment the
+    //       badge twice.
+    const pushStatus = pushStatusHandler(config, pushObject.id);
+    return (
+      Promise.resolve()
+        // .then(() => {
+        //   return badgeUpdate();
+        // })
+        .then(() => {
+          return config.pushControllerQueue.enqueue(
+            body,
+            where,
+            config,
+            auth,
+            pushStatus
+          );
+        })
+        .catch(err => {
+          return pushStatus.fail(err).then(() => {
+            throw err;
+          });
+        })
+    );
+  }
+
   /**
    * Get expiration time from the request body.
    * @param {Object} request A request object

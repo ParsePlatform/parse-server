@@ -30,6 +30,7 @@ import { ParseLiveQueryServer } from './LiveQuery/ParseLiveQueryServer';
 import { PagesRouter } from './Routers/PagesRouter';
 import { PublicAPIRouter } from './Routers/PublicAPIRouter';
 import { PushRouter } from './Routers/PushRouter';
+import { ScheduledPushRouter } from './Routers/ScheduledPushRouter';
 import { CloudCodeRouter } from './Routers/CloudCodeRouter';
 import { RolesRouter } from './Routers/RolesRouter';
 import { SchemasRouter } from './Routers/SchemasRouter';
@@ -220,6 +221,7 @@ class ParseServer {
       new FunctionsRouter(),
       new SchemasRouter(),
       new PushRouter(),
+      new ScheduledPushRouter(),
       new LogsRouter(),
       new IAPValidationRouter(),
       new FeaturesRouter(),
