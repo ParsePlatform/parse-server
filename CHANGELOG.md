@@ -4,7 +4,8 @@ Jump directly to a version:
 
 | 4.x               |
 |-------------------|
-| [**4.5.0 (latest release)**](#450) |
+| [**4.5.1 (latest release)**](#450) |
+| [4.5.0](#450) |
 | [4.4.0](#440)     |
 | [4.3.0](#430)     |
 | [4.2.0](#420)     |
@@ -105,6 +106,7 @@ ___
 
 ### Other Changes
 - Fix error when a not yet inserted job is updated (Antonio Davi Macedo Coelho de Castro) [#7196](https://github.com/parse-community/parse-server/pull/7196)
+- Fix error when a not yet inserted job is updated (Antonio Davi Macedo Coelho de Castro) [#7196](https://github.com/parse-community/parse-server/pull/7196)
 - request.context for afterFind triggers (dblythy) [#7078](https://github.com/parse-community/parse-server/pull/7078)
 - Winston Logger interpolating stdout to console (dplewis) [#7114](https://github.com/parse-community/parse-server/pull/7114)
 - Move graphql-tag from devDependencies to dependencies (Antonio Davi Macedo Coelho de Castro) [#7183](https://github.com/parse-community/parse-server/pull/7183)
@@ -142,6 +144,7 @@ ___
 ### Breaking Changes
 - FIX: Consistent casing for afterLiveQueryEvent. The afterLiveQueryEvent was introduced in 4.4.0 with inconsistent casing for the event names, which was fixed in 4.5.0. [#7023](https://github.com/parse-community/parse-server/pull/7023). Thanks to [dblythy](https://github.com/dblythy).
 ### Other Changes
+- IMPROVE: Create schema request serialisation. [#6059](https://github.com/parse-community/parse-server/issues/6059).
 - FIX: Properly handle serverURL and publicServerUrl in Batch requests. [#7049](https://github.com/parse-community/parse-server/pull/7049). Thanks to [Zach Goldberg](https://github.com/ZachGoldberg).
 - IMPROVE: Prevent invalid column names (className and length). [#7053](https://github.com/parse-community/parse-server/pull/7053). Thanks to [Diamond Lewis](https://github.com/dplewis).
 - IMPROVE: GraphQL: Remove viewer from logout mutation. [#7029](https://github.com/parse-community/parse-server/pull/7029). Thanks to [Antoine Cormouls](https://github.com/Moumouls).

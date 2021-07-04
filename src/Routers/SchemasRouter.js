@@ -5,6 +5,8 @@ var Parse = require('parse/node').Parse,
 
 import PromiseRouter from '../PromiseRouter';
 import * as middleware from '../middlewares';
+import { filterOptions } from '../Controllers/SchemaController';
+import Utils from '../Utils';
 
 function classNameMismatchResponse(bodyClass, pathClass) {
   throw new Parse.Error(
@@ -35,7 +37,38 @@ function getOneSchema(req) {
     });
 }
 
+function handleSchemaOptions(options, requestSchema) {
+  if (
+    options.ignoreDefaultFields &&
+    typeof options.ignoreDefaultFields === 'boolean' &&
+    options.ignoreDefaultFields === true
+  ) {
+    const filterOption = filterOptions.find(f => f.label === 'ignoreDefaultFields');
+    if (!filterOption) {
+      throw new Parse.Error(`ignoreDefaultFields not registered in filter options list`);
+    }
+    requestSchema.fields = filterOption.do(requestSchema.fields);
+  }
+  return requestSchema;
+}
+
+function getOptionParamsFromRequest(req) {
+  const options = new URLSearchParams(req.query);
+  const filtered = {};
+  for (let i = 0; i < filterOptions.length; i++) {
+    if (options.has(filterOptions[i].label)) {
+      filtered[filterOptions[i].label] = new Utils().convertType(
+        filterOptions[i].defaultValue,
+        options.get(filterOptions[i].label)
+      );
+    }
+  }
+  return Object.keys(filtered).length > 0 ? filtered : undefined;
+}
+
 function createSchema(req) {
+  let requestSchema = Object.assign({}, req.body);
+
   if (req.auth.isReadOnly) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -53,14 +86,20 @@ function createSchema(req) {
     throw new Parse.Error(135, `POST ${req.path} needs a class name.`);
   }
 
+  // handle options.
+  const options = getOptionParamsFromRequest(req) || req.body.options;
+  if (options && typeof options === 'object') {
+    requestSchema = handleSchemaOptions(options, requestSchema);
+  }
+
   return req.config.database
     .loadSchema({ clearCache: true })
     .then(schema =>
       schema.addClassIfNotExists(
         className,
-        req.body.fields,
-        req.body.classLevelPermissions,
-        req.body.indexes
+        requestSchema.fields,
+        requestSchema.classLevelPermissions,
+        requestSchema.indexes
       )
     )
     .then(schema => ({ response: schema }));

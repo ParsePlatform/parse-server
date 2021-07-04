@@ -30,6 +30,22 @@ import type {
   LoadSchemaOptions,
 } from './types';
 
+const filterOptions: Array<{ label: string, type: string }> = [
+  {
+    label: 'ignoreDefaultFields',
+    defaultValue: false,
+    do: fields => {
+      const newFields = {};
+      Object.keys(fields)?.map(field => {
+        if (Object.keys(defaultColumns._Default).includes(field) === false) {
+          newFields[field] = fields[field];
+        }
+      });
+      return newFields;
+    },
+  },
+];
+
 const defaultColumns: { [string]: SchemaFields } = Object.freeze({
   // Contain the default columns for every parse object type (except _Join collection)
   _Default: {
@@ -1585,4 +1601,5 @@ export {
   convertSchemaToAdapterSchema,
   VolatileClassesSchemas,
   SchemaController,
+  filterOptions,
 };

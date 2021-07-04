@@ -200,6 +200,14 @@ class Utils {
       }
     }
   }
+
+  convertType(typedVar, ...args) {
+    return {
+      boolean: v => v == 'true',
+      number: Number,
+      string: String,
+    }[typeof typedVar](args);
+  }
 }
 
 module.exports = Utils;
