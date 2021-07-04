@@ -390,6 +390,30 @@ describe('ParseLiveQuery', function () {
     await parent.save();
   });
 
+  it('afterEvent should work with date', async done => {
+    await reconfigureServer({
+      liveQuery: {
+        classNames: ['TestObject'],
+      },
+      startLiveQueryServer: true,
+    });
+    Parse.Cloud.afterLiveQueryEvent('TestObject', request => {
+      const date = request.object.get('date');
+      expect(date).toBeDefined();
+      expect(date).toBeInstanceOf(Date);
+      done();
+    });
+
+    const query = new Parse.Query(TestObject);
+    await query.subscribe();
+
+    let object = new TestObject();
+    object.set('date', new Date());
+    const json = object.toJSON();
+    object = Parse.Object.fromJSON(json, false, true);
+    await object.save();
+  });
+
   it('can handle beforeConnect / beforeSubscribe hooks', async done => {
     await reconfigureServer({
       liveQuery: {
