@@ -77,7 +77,7 @@ export class FilesRouter {
       });
     } else {
       filesController
-        .getFileData(config, filename)
+        .getFileData(config, filename, req.query)
         .then(data => {
           res.status(200);
           res.set('Content-Type', contentType);

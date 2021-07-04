@@ -11,8 +11,8 @@ const legacyFilesRegex = new RegExp(
 );
 
 export class FilesController extends AdaptableController {
-  getFileData(config, filename) {
-    return this.adapter.getFileData(filename);
+  getFileData(config, filename, query) {
+    return this.adapter.getFileData(filename, query);
   }
 
   createFile(config, filename, data, contentType, options) {

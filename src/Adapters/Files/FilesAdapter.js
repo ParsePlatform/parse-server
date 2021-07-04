@@ -54,7 +54,7 @@ export class FilesAdapter {
    *
    * @return {Promise} a promise that should pass with the file data or fail on error
    */
-  getFileData(filename: string): Promise<any> {}
+  getFileData(filename: string, query: object | null): Promise<any> {}
 
   /** Returns an absolute URL where the file can be accessed
    *
