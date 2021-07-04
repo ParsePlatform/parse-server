@@ -67,6 +67,7 @@
     "@babel/plugin-proposal-object-rest-spread": "7.10.0",
     "@babel/plugin-transform-flow-strip-types": "7.9.0",
     "@babel/preset-env": "7.10.0",
+    "@khanacademy/flow-to-ts": "^0.5.1",
     "@parse/minami": "1.0.0",
     "all-node-versions": "8.0.0",
     "apollo-cache-inmemory": "1.6.6",
@@ -87,6 +88,7 @@
     "husky": "4.2.5",
     "jasmine": "3.5.0",
     "jasmine-spec-reporter": "6.0.0",
+    "jscodeshift": "^0.11.0",
     "jsdoc": "3.6.3",
     "jsdoc-babel": "0.5.0",
     "lint-staged": "10.2.3",
@@ -124,6 +126,9 @@
     "prettier": "prettier --write '{src,spec}/{**/*,*}.js'",
     "prepare": "npm run build",
     "postinstall": "node -p 'require(\"./postinstall.js\")()'",
+    "pretypes": "npm run build",
+    "types": "npx typescript",
+    "flow-to-ts": "node resources/flow-to-ts.js",
     "madge:circular": "node_modules/.bin/madge ./src --circular"
   },
   "engines": {

@@ -1,0 +1,22 @@
+{
+  "include": ["tmp-ts/**/*"],
+  "compilerOptions": {
+    // Read JS files; normally they are ignored as source files
+    "allowJs": true,
+    // Generate d.ts files
+    "declaration": true,
+    // Only output d.ts files
+    "emitDeclarationOnly": true,
+    // Types destination directory; removing this would place the .d.ts files next to the .js files
+    "outDir": "types",
+    // Skip node_modules scan
+    "skipLibCheck": true,
+    "types": [],
+  },
+  "exclude": [
+    "node_modules",
+    "./node_modules",
+    "./node_modules/*",
+    "./node_modules/@types/node/index.d.ts",
+  ],
+}
