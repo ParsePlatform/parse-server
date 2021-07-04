@@ -337,7 +337,16 @@ export function getResponseObject(request, resolve, reject) {
       }
       response = {};
       if (request.triggerName === Types.beforeSave) {
-        response['object'] = request.object._getSaveJSON();
+        try {
+          response['object'] = request.object._getSaveJSON();
+        } catch (error) {
+          // https://github.com/parse-community/parse-server/issues/7192
+          const e = resolveError(error, {
+            code: Parse.Error.VALIDATION_ERROR,
+            message: 'Failed to convert beforeSave result to valid JSON.',
+          });
+          return reject(e);
+        }
         response['object']['objectId'] = request.object.id;
       }
       return resolve(response);
@@ -844,13 +853,16 @@ export function maybeRunTrigger(
         resolve(object);
       },
       error => {
-        logTriggerErrorBeforeHook(
-          triggerType,
-          parseObject.className,
-          parseObject.toJSON(),
-          auth,
-          error
-        );
+        var parseObjectJSON;
+        try {
+          parseObjectJSON = parseObject.toJSON();
+        } catch (error2) {
+          // https://github.com/parse-community/parse-server/issues/7192
+          // parseObject.toJSON() could throw exceptions like {"message":"Tried to encode an invalid date.","code":142}
+          // Here we long the error but unfortunately cannot get the input
+          parseObjectJSON = {};
+        }
+        logTriggerErrorBeforeHook(triggerType, parseObject.className, parseObjectJSON, auth, error);
         reject(error);
       }
     );

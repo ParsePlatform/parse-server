@@ -1819,6 +1819,22 @@ describe('beforeSave hooks', () => {
     expect(res.length).toEqual(1);
     expect(res[0].get('foo')).toEqual('bar');
   });
+
+  it('rejects saving with invalid iso date and beforeSave hook (#7192)', async () => {
+    Parse.Cloud.beforeSave('TestObject', () => {});
+    const dates = [
+      new Date(Date.parse(null)),
+      { __type: 'Date', iso: 'invalidIsoDate' },
+      { __type: 'Date', iso: '' },
+    ];
+    for (const date of dates) {
+      const obj = new Parse.Object('TestObject');
+      obj.set('date', date);
+      await expectAsync(obj.save()).toBeRejectedWith(
+        new Parse.Error(142, 'Tried to encode an invalid date.')
+      );
+    }
+  });
 });
 
 describe('afterSave hooks', () => {
