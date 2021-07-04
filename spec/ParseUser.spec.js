@@ -12,6 +12,7 @@ const request = require('../lib/request');
 const passwordCrypto = require('../lib/password');
 const Config = require('../lib/Config');
 const cryptoUtils = require('../lib/cryptoUtils');
+const UsersRouter = require('../lib/Routers/UsersRouter');
 
 function verifyACL(user) {
   const ACL = user.getACL();
@@ -3928,6 +3929,45 @@ describe('Parse.User testing', () => {
     } catch (e) {
       expect(e.code).toBe(Parse.Error.SESSION_MISSING);
     }
+  });
+
+  describe('UsersRouter.handleLogIn', () => {
+    it('should work with valid userFromJWT', async done => {
+      const user = await Parse.User.signUp('some_user', 'some_password');
+
+      const fakeReq = {
+        userFromJWT: user,
+        config: Config.get('test'),
+        info: {},
+      };
+
+      const { response = {} } = await new UsersRouter.UsersRouter().handleLogIn(fakeReq);
+
+      expect(user.id).toEqual(response.objectId);
+      expect(response.sessionToken).toBeTruthy();
+      done();
+    });
+
+    it('should fail with non-existing userFromJWT', async done => {
+      const user = new Parse.User({
+        username: 'not_a_real_user',
+        id: '1234567',
+      });
+
+      const fakeReq = {
+        userFromJWT: user,
+        config: Config.get('test'),
+        info: {},
+      };
+
+      try {
+        await new UsersRouter.UsersRouter().handleLogIn(fakeReq);
+        fail('User login should not have succeeded');
+      } catch (error) {
+        expect(error.code).toEqual(101);
+      }
+      done();
+    });
   });
 
   describe('issue #4897', () => {

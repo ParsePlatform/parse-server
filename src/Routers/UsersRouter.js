@@ -149,6 +149,34 @@ export class UsersRouter extends ClassesRouter {
     });
   }
 
+  /**
+   * Validates JWT bearer token and looks up user `req.userFromJWT`. CRITICALLY IMPORTANT that the JWT has already been validated by this point (eg: express middleware, AWS API Gateway Authorizer)
+   * @param {Object} req The request
+   * @returns {Object} User object
+   */
+  _authenticateUserFromRequestWithJwt(req) {
+    return new Promise((resolve, reject) => {
+      if (!req.userFromJWT) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid credentials.');
+      }
+
+      const query = {
+        objectId: req.userFromJWT.id,
+      };
+      return req.config.database
+        .find('_User', query)
+        .then(results => {
+          if (!results.length)
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid credentials.');
+          const user = results[0];
+          resolve(user);
+        })
+        .catch(error => {
+          return reject(error);
+        });
+    });
+  }
+
   handleMe(req) {
     if (!req.info || !req.info.sessionToken) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Invalid session token');
@@ -181,10 +209,17 @@ export class UsersRouter extends ClassesRouter {
   }
 
   async handleLogIn(req) {
-    const user = await this._authenticateUserFromRequest(req);
+    let userFromJWT;
+    if (req.userFromJWT) {
+      // Could be just used `req.userFromJWT`, but the forced lookup
+      // Ensures the user hasn't been deleted since the the JWT was granted
+      userFromJWT = await this._authenticateUserFromRequestWithJwt(req);
+    }
 
-    // handle password expiry policy
-    if (req.config.passwordPolicy && req.config.passwordPolicy.maxPasswordAge) {
+    const user = userFromJWT || (await this._authenticateUserFromRequest(req));
+
+    // handle password expiry policy - ignore if user is managed in SSO (provided by JWT)
+    if (!userFromJWT && req.config.passwordPolicy && req.config.passwordPolicy.maxPasswordAge) {
       let changedAt = user._password_changed_at;
 
       if (!changedAt) {
