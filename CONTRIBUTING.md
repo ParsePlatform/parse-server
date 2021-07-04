@@ -116,6 +116,7 @@ Once you have babel running in watch mode, you can start making changes to parse
 * Take testing seriously! Aim to increase the test coverage with every pull request. To obtain the test coverage of the project, run: `npm run coverage`
 * Run the tests for the file you are working on with the following command: `npm test spec/MyFile.spec.js`
 * Run the tests for the whole project to make sure the code passes all tests. This can be done by running the test command for a single file but removing the test file argument. The results can be seen at *<PROJECT_ROOT>/coverage/lcov-report/index.html*.
+* Format your code by running `npm run clean`.
 * Lint your code by running `npm run lint` to make sure the code is not going to be rejected by the CI.
 * **Do not** publish the *lib* folder.
 * Mocks belong in the `spec/support` folder.

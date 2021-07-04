@@ -46,7 +46,7 @@ class CheckRunner {
 
     // If report should be written to logs
     if (this.enableCheckLog) {
-      this._logReport(report)
+      this._logReport(report);
     }
     return report;
   }
@@ -85,8 +85,8 @@ class CheckRunner {
       report: {
         version,
         state: CheckState.success,
-        groups: []
-      }
+        groups: [],
+      },
     };
 
     // Identify report version
@@ -95,13 +95,12 @@ class CheckRunner {
       default:
         // For each check group
         for (const group of groups) {
-
           // Create group report
           const groupReport = {
             name: group.name(),
             state: CheckState.success,
             checks: [],
-          }
+          };
 
           // Create check reports
           groupReport.checks = group.checks().map(check => {
@@ -129,9 +128,9 @@ class CheckRunner {
    * @param {Object} report The report to log.
    */
   _logReport(report) {
-
     // Determine log level depending on whether any check failed
-    const log = report.report.state == CheckState.success ? (s) => logger.info(s) : (s) => logger.warn(s);
+    const log =
+      report.report.state == CheckState.success ? s => logger.info(s) : s => logger.warn(s);
 
     // Declare output
     const indent = '   ';
@@ -142,7 +141,7 @@ class CheckRunner {
 
     // Traverse all groups and checks for compose output
     for (const group of report.report.groups) {
-      output += `\n- ${group.name}`
+      output += `\n- ${group.name}`;
 
       for (const check of group.checks) {
         checksCount++;
@@ -166,7 +165,9 @@ class CheckRunner {
       `\n#                                 #` +
       `\n###################################` +
       `\n` +
-      `\n${failedChecksCount > 0 ? 'Warning: ' : ''}${failedChecksCount} weak security setting(s) found${failedChecksCount > 0 ? '!' : ''}` +
+      `\n${
+        failedChecksCount > 0 ? 'Warning: ' : ''
+      }${failedChecksCount} weak security setting(s) found${failedChecksCount > 0 ? '!' : ''}` +
       `\n${checksCount} check(s) executed` +
       `\n${skippedCheckCount} check(s) skipped` +
       `\n` +
@@ -183,9 +184,12 @@ class CheckRunner {
    */
   _getLogIconForState(state) {
     switch (state) {
-      case CheckState.success: return '✅';
-      case CheckState.fail: return '❌';
-      default: return 'ℹ️';
+      case CheckState.success:
+        return '✅';
+      case CheckState.fail:
+        return '❌';
+      default:
+        return 'ℹ️';
     }
   }
 

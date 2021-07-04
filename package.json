@@ -102,6 +102,7 @@
   },
   "scripts": {
     "ci:check": "node ./resources/ci/ciCheck.js",
+    "clean": "npm run prettier && npm run lint-fix",
     "definitions": "node ./resources/buildConfigDefinitions.js && prettier --write 'src/Options/*.js'",
     "docs": "jsdoc -c ./jsdoc-conf.json",
     "lint": "flow && eslint --cache ./",
