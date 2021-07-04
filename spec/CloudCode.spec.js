@@ -90,6 +90,37 @@ describe('Cloud Code', () => {
     );
   });
 
+  it('unsets invalid field name in beforeSave on update', function (done) {
+    Parse.Cloud.beforeSave('InvalidFieldNameObject', function (request) {
+      const object = request.object;
+      object.unset('length');
+    });
+
+    const obj = new Parse.Object('InvalidFieldNameObject');
+    // Create object
+    obj.save().then(
+      () => {
+        obj.set('length', 1);
+        // Update object
+        obj.save().then(
+          () => {
+            done();
+          },
+          error => {
+            fail(
+              'Should have unset invalid field name in beforeSave and saved successfully, \
+              but error occured before beforeSave: ' +
+                error.message
+            );
+          }
+        );
+      },
+      error => {
+        fail(error.message);
+      }
+    );
+  });
+
   it('returns an error', done => {
     Parse.Cloud.define('cloudCodeWithError', () => {
       /* eslint-disable no-undef */
