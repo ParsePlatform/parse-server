@@ -85,4 +85,22 @@ describe('AggregateRouter', () => {
     const result = AggregateRouter.getPipeline(body);
     expect(result).toEqual(expected);
   });
+
+  it("support stage name starting with '$'", () => {
+    const body = {
+      $match: { someKey: 'whatever' },
+    };
+    const expected = [{ $match: { someKey: 'whatever' } }];
+    const result = AggregateRouter.getPipeline(body);
+    expect(result).toEqual(expected);
+  });
+
+  it("support group stage using '_id'", () => {
+    const body = {
+      group: { _id: {} },
+    };
+    const expected = [{ $group: { _id: {} } }];
+    const result = AggregateRouter.getPipeline(body);
+    expect(result).toEqual(expected);
+  });
 });

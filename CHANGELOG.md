@@ -104,6 +104,7 @@ ___
 - Add REST API endpoint `/loginAs` to create session of any user with master key; allows to impersonate another user. (GormanFletcher) [#7406](https://github.com/parse-community/parse-server/pull/7406)
 
 ### Other Changes
+- Support aggregation stage names starting with `$` and `$group` stages using `_id` instead of `objectId`, just like in MongoDB (Raschid JF Rafeally) [#7339](https://github.com/parse-community/parse-server/pull/7339)
 - Fix error when a not yet inserted job is updated (Antonio Davi Macedo Coelho de Castro) [#7196](https://github.com/parse-community/parse-server/pull/7196)
 - request.context for afterFind triggers (dblythy) [#7078](https://github.com/parse-community/parse-server/pull/7078)
 - Winston Logger interpolating stdout to console (dplewis) [#7114](https://github.com/parse-community/parse-server/pull/7114)
