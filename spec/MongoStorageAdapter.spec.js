@@ -338,8 +338,8 @@ describe_only_db('mongo')('MongoStorageAdapter', () => {
       { username: 'bugs' },
       { caseInsensitive: true, explain: true }
     );
-    expect(preIndexPlan.executionStats.executionStages.stage).toBe('COLLSCAN');
-    expect(postIndexPlan.executionStats.executionStages.stage).toBe('FETCH');
+    expect(preIndexPlan[0].executionStats.executionStages.stage).toBe('COLLSCAN');
+    expect(postIndexPlan[0].executionStats.executionStages.stage).toBe('FETCH');
   });
 
   it('should delete field without index', async () => {

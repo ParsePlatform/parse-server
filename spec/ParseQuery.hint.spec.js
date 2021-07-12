@@ -153,7 +153,7 @@ describe_only_db('mongo')('Parse.Query hint', () => {
     });
     let response = await request(options);
     let explain = response.data.results;
-    expect(explain.queryPlanner.winningPlan.inputStage.stage).toBe('COLLSCAN');
+    expect(explain[0].queryPlanner.winningPlan.inputStage.stage).toBe('COLLSCAN');
 
     options = Object.assign({}, masterKeyOptions, {
       url: Parse.serverURL + '/classes/TestObject',
@@ -164,7 +164,7 @@ describe_only_db('mongo')('Parse.Query hint', () => {
     });
     response = await request(options);
     explain = response.data.results;
-    expect(explain.queryPlanner.winningPlan.inputStage.inputStage.indexName).toBe('_id_');
+    expect(explain[0].queryPlanner.winningPlan.inputStage.inputStage.indexName).toBe('_id_');
   });
 
   it_only_mongodb_version('<4.4')('query aggregate with hint (rest)', async () => {

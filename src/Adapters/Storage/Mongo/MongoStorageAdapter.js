@@ -622,7 +622,7 @@ export class MongoStorageAdapter implements StorageAdapter {
       )
       .then(objects => {
         if (explain) {
-          return objects;
+          return [objects];
         }
         return objects.map(object => mongoObjectToParseObject(className, object, schema));
       })
