@@ -33,7 +33,7 @@
     "deepcopy": "2.1.0",
     "express": "4.17.1",
     "follow-redirects": "1.14.1",
-    "graphql": "15.5.0",
+    "graphql": "15.5.1",
     "graphql-list-fields": "2.0.2",
     "graphql-relay": "0.7.0",
     "graphql-tag": "2.12.4",
